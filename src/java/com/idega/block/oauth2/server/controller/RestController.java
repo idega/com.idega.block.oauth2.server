@@ -80,7 +80,7 @@
  *     License that was purchased to become eligible to receive the Source 
  *     Code after Licensee receives the source code. 
  */
-package com.idega.block.oauth2.service.controller;
+package com.idega.block.oauth2.server.controller;
 
 import java.util.Arrays;
 import java.util.List;
