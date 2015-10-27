@@ -250,20 +250,17 @@
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
 	</security:http>
 
-	<!-- Unknown stuff -->
-
 	<!-- This is simple authentication manager, with a hardcoded user/password 
 		combination. We can replace this with a user defined service to get few users 
 		credentials from DB -->
 	<security:authentication-manager
 		alias="authenticationManager">
 		<security:authentication-provider>
-			<security:user-service>
-				<security:user
-					name="beingjavaguys"
-					password="spring@java"
-					authorities="ROLE_APP" />
-			</security:user-service>
+			<security:jdbc-user-service 
+				data-source-ref="dataSource"
+				authorities-by-username-query="SELECT icl.user_login AS 'username', CASE WHEN icli.account_enabled = 'Y' THEN 'ROLE_APP' ELSE 'ROLE_APP' END AS 'authority' FROM idega.ic_login icl JOIN ic_login_info icli ON icli.ic_login_id = icl.ic_login_id WHERE icl.user_login = ?"
+				users-by-username-query="SELECT icl.user_login AS 'username', usr_password AS 'password', CASE WHEN icli.account_enabled = 'Y' THEN TRUE ELSE FALSE END AS 'enabled' FROM idega.ic_login icl JOIN ic_login_info icli ON icli.ic_login_id = icl.ic_login_id WHERE icl.user_login = ?"
+			/>
 		</security:authentication-provider>
 	</security:authentication-manager>
 
