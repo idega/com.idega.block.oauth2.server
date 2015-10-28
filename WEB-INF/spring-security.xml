@@ -24,27 +24,6 @@
 		Protecting the token endpoint
 	-->
 
-	<!-- 
-		Depending on how many clients we expect to access the service will 
-		determine what type of client details service we implement. A simple 
-		file-based service might be sufficient. If you wanted to go a lot 
-		further with client sign up and managing API keys then you would have 
-		to involve a persistence tier for the client details service. 
-		Configuring with the default Spring file-based service is trivial:
-	-->
-	<!-- <oauth:client-details-service 
-		id="clientDetails"
-		>
-		client
-		<oauth:client
-			client-id="restapp"
-			authorized-grant-types="password,authorization_code,refresh_token,implicit"
-			secret="restapp"
-			scope="read,write,trust"
-			authorities="ROLE_APP" />
-
-	</oauth:client-details-service> -->
-
 	<bean
 		id="clientDetails"
 		class="org.springframework.security.oauth2.provider.client.JdbcClientDetailsService">
@@ -111,33 +90,11 @@
 			ref="clientCredentialsTokenEndpointFilter"
 			after="BASIC_AUTH_FILTER" />
 	</security:http>
-	
-	<!--
-		Configuring User Authentication Services
-	-->
 
-	<!-- 
-		The Resource Owner Password flow requires an authentication manager for 
-		managing users.
-		The password encoder is used to encrypt the password on authentication. 
-		The user service also uses the same encoder to encrypt passwords before 
-		persisting them. The user service must implement UserDetailsService 
-		and retrieve the user by username.
-	-->
-	<!-- <bean
-		id="passwordEncoder"
-		class="org.springframework.security.crypto.password.StandardPasswordEncoder" />
-	<security:authentication-manager alias="userAuthenticationManager">
-		<security:authentication-provider
-			user-service-ref="userService">
-			<security:password-encoder ref="passwordEncoder" />
-		</security:authentication-provider>
-	</security:authentication-manager> -->
-	
 	<!--
 		Configuring Token Services
 	-->
-	
+
 	<!--
 		The final piece of configuration is to manage storage and retrieval of 
 		access tokens.
@@ -196,7 +153,7 @@
 		<oauth:client-credentials />
 		<oauth:password />
 	</oauth:authorization-server>
-	
+
 	<!--
 		Protecting access to resources
 	-->
