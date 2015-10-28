@@ -91,7 +91,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * <p>TODO</p>
+ * <p>A controller for testing OAuth service</p>
  * <p>You can report about problems to: 
  * <a href="mailto:martynas@idega.is">Martynas Stakė</a></p>
  *
@@ -99,12 +99,12 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
 @Controller
-@RequestMapping("/api/users")
+@RequestMapping("/api/test")
 public class RestController {
 
 	@RequestMapping(value = "/", method = RequestMethod.GET)
 	@ResponseBody
 	public List<String> list() {
-		return Arrays.asList("User1", "User2", "User3");
+		return Arrays.asList("test1", "test2", "test3");
 	}
 }

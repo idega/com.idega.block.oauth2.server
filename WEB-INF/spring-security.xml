@@ -14,9 +14,11 @@
 
 	<!-- This defined token store, we have used inmemory tokenstore for now 
 		but this can be changed to a user defined one -->
-	<!-- <bean
+	<bean
 		id="tokenStore"
-		class="org.springframework.security.oauth2.provider.token.store.InMemoryTokenStore" /> -->
+		class="org.springframework.security.oauth2.provider.token.store.JdbcTokenStore" >
+		<constructor-arg ref="dataSource" />
+	</bean>
 
 	<!--
 		Protecting the token endpoint
@@ -30,15 +32,10 @@
 		to involve a persistence tier for the client details service. 
 		Configuring with the default Spring file-based service is trivial:
 	-->
-	<oauth:client-details-service id="clientDetails">
-		<!-- client -->
-		<oauth:client
-			client-id="restapp"
-			authorized-grant-types="authorization_code,client_credentials"
-			authorities="ROLE_APP"
-			scope="read,write,trust"
-			secret="secret" />
-
+	<!-- <oauth:client-details-service 
+		id="clientDetails"
+		>
+		client
 		<oauth:client
 			client-id="restapp"
 			authorized-grant-types="password,authorization_code,refresh_token,implicit"
@@ -46,7 +43,13 @@
 			scope="read,write,trust"
 			authorities="ROLE_APP" />
 
-	</oauth:client-details-service>
+	</oauth:client-details-service> -->
+
+	<bean
+		id="clientDetails"
+		class="org.springframework.security.oauth2.provider.client.JdbcClientDetailsService">
+		<constructor-arg ref="dataSource" />
+	</bean>
 
 	<!-- 
 		Next we configure the authentication manager and client details service 
@@ -151,7 +154,7 @@
 			value="true" />
 		<property
 			name="accessTokenValiditySeconds"
-			value="120" />
+			value="1200" />
 		<property
 			name="clientDetailsService"
 			ref="clientDetails" />

@@ -1,5 +1,5 @@
 /**
- * @(#)TokenStoreConfiguration.java    1.0.0 15:41:34
+ * @(#)IWBundleStarter.java    1.0.0 10:50:52
  *
  * Idega Software hf. Source Code Licence Agreement x
  *
@@ -80,62 +80,54 @@
  *     License that was purchased to become eligible to receive the Source 
  *     Code after Licensee receives the source code. 
  */
-package com.idega.block.oauth2.server.configuration;
+package com.idega.block.oauth2.server;
 
-import java.util.logging.Level;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.oauth2.provider.client.BaseClientDetails;
+import org.springframework.security.oauth2.provider.client.JdbcClientDetailsService;
 
-import javax.sql.DataSource;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.oauth2.provider.token.TokenStore;
-import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
-
-import com.idega.data.IDOHome;
-import com.idega.data.IDOLookup;
-import com.idega.data.IDOLookupException;
-import com.idega.user.data.User;
-import com.idega.util.StringUtil;
-import com.idega.util.database.ConnectionBroker;
+import com.idega.idegaweb.IWBundle;
+import com.idega.idegaweb.IWBundleStartable;
+import com.idega.util.ListUtil;
+import com.idega.util.expression.ELUtil;
 
 /**
- * <p>Configuration for {@link TokenStore} bean</p>
+ * <p>Initial module configuration</p>
  * <p>You can report about problems to: 
  * <a href="mailto:martynas@idega.is">Martynas Stakė</a></p>
  *
- * @version 1.0.0 2015-10-23
+ * @version 1.0.0 2015 spal. 28
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
-@Configuration
-public class TokenStoreConfiguration {
+public class IWBundleStarter implements IWBundleStartable {
 
-	private IDOHome idoHome;
+	@Autowired
+	@Qualifier("clientDetails")
+	private JdbcClientDetailsService clientDetailsService;
 
-	private IDOHome getIDOHome() {
-		if (this.idoHome == null) {
-			try {
-				this.idoHome = IDOLookup.getHome(User.class);
-			} catch (IDOLookupException e) {
-				java.util.logging.Logger.getLogger(getClass().getName()).log(
-						Level.WARNING, "Failed to get " + IDOHome.class + " cause of: ", e);
-			}
+	private JdbcClientDetailsService getClientDetailsService() {
+		if (this.clientDetailsService == null) {
+			ELUtil.getInstance().autowire(this);
 		}
 
-		return this.idoHome;
+		return clientDetailsService;
 	}
 
-	@Bean
-	public TokenStore tokenStore() {
-		String dataSourceName = getIDOHome().getDatasource();
-		if (StringUtil.isEmpty(dataSourceName)) {
-			throw new IllegalStateException("No datasource name found!");
+	@Override
+	public void start(IWBundle starterBundle) {
+		if (ListUtil.isEmpty(getClientDetailsService().listClientDetails())) {
+			BaseClientDetails details = new BaseClientDetails(
+					"restapp", 
+					null, 
+					"read,write,trust", 
+					"password,authorization_code,refresh_token,implicit", 
+					"ROLE_APP");
+			details.setClientSecret("restapp");
+			getClientDetailsService().addClientDetails(details);
 		}
-
-		DataSource dataSource = ConnectionBroker.getDataSource(dataSourceName);
-		if (dataSource == null) {
-			throw new IllegalStateException("Data source not found by name: " + dataSourceName);
-		}
-
-		return new JdbcTokenStore(dataSource);
 	}
+
+	@Override
+	public void stop(IWBundle starterBundle) {}
 }
