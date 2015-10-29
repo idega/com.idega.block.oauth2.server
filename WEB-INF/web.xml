@@ -20,7 +20,7 @@
 
 	<servlet-mapping>
 		<servlet-name>OAuth2</servlet-name>
-		<url-pattern>/*</url-pattern>
+		<url-pattern>/authentication/*</url-pattern>
 	</servlet-mapping>
 
 	<listener>
