@@ -1,5 +1,5 @@
 /**
- * @(#)IWBundleStarter.java    1.0.0 10:50:52
+ * @(#)OAuthDAO.java    1.0.0 16:03:58
  *
  * Idega Software hf. Source Code Licence Agreement x
  *
@@ -80,68 +80,23 @@
  *     License that was purchased to become eligible to receive the Source 
  *     Code after Licensee receives the source code. 
  */
-package com.idega.block.oauth2.server;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.security.oauth2.provider.client.BaseClientDetails;
-import org.springframework.security.oauth2.provider.client.JdbcClientDetailsService;
-
-import com.idega.block.oauth2.server.data.dao.OAuth2DAO;
-import com.idega.idegaweb.IWBundle;
-import com.idega.idegaweb.IWBundleStartable;
-import com.idega.util.ListUtil;
-import com.idega.util.expression.ELUtil;
+package com.idega.block.oauth2.server.data.dao;
 
 /**
- * <p>Initial module configuration</p>
+ * <p>Manages tables of Spring OAuth2 </p>
  * <p>You can report about problems to: 
  * <a href="mailto:martynas@idega.is">Martynas Stakė</a></p>
  *
- * @version 1.0.0 2015 spal. 28
+ * @version 1.0.0 2015 spal. 30
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
-public class IWBundleStarter implements IWBundleStartable {
+public interface OAuth2DAO {
 
-	@Autowired
-	@Qualifier("clientDetails")
-	private JdbcClientDetailsService clientDetailsService;
-
-	@Autowired
-	private OAuth2DAO oAuth2DAO;
-
-	private OAuth2DAO getOAuth2DAO() {
-		if (this.oAuth2DAO == null) {
-			ELUtil.getInstance().autowire(this);
-		}
-
-		return this.oAuth2DAO;
-	}
-
-	private JdbcClientDetailsService getClientDetailsService() {
-		if (this.clientDetailsService == null) {
-			ELUtil.getInstance().autowire(this);
-		}
-
-		return clientDetailsService;
-	}
-
-	@Override
-	public void start(IWBundle starterBundle) {
-		getOAuth2DAO().checkTables();
-		
-		if (ListUtil.isEmpty(getClientDetailsService().listClientDetails())) {
-			BaseClientDetails details = new BaseClientDetails(
-					"restapp", 
-					null, 
-					"read,write,trust", 
-					"password,authorization_code,refresh_token,implicit", 
-					"ROLE_APP");
-			details.setClientSecret("restapp");
-			getClientDetailsService().addClientDetails(details);
-		}
-	}
-
-	@Override
-	public void stop(IWBundle starterBundle) {}
+	/**
+	 * 
+	 * <p>Creates missing tables if does not exist</p>
+	 * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
+	 */
+	void checkTables();
+	
 }
