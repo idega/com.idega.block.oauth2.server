@@ -97,7 +97,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.stereotype.Service;
 
-import com.idega.block.oauth2.server.business.OAuth2Service;
+import com.idega.block.login.business.OAuth2Service;
 import com.idega.core.accesscontrol.business.LoginBusinessBean;
 import com.idega.core.accesscontrol.data.LoginTable;
 import com.idega.core.accesscontrol.data.LoginTableHome;
@@ -116,7 +116,7 @@ import com.idega.util.expression.ELUtil;
  * @version 1.0.0 2015 spal. 30
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
-@Service
+@Service("oauth2Service")
 @Scope(BeanDefinition.SCOPE_SINGLETON)
 public class OAuth2ServiceImpl implements OAuth2Service {
 
