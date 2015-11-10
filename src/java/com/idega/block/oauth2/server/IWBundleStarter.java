@@ -132,12 +132,30 @@ public class IWBundleStarter implements IWBundleStartable {
 		
 		if (ListUtil.isEmpty(getClientDetailsService().listClientDetails())) {
 			BaseClientDetails details = new BaseClientDetails(
-					"restapp", 
+					"restapp",
+					null,
+					"read,write,trust",
+					"password,authorization_code,refresh_token,implicit",
+					"ROLE_APP");
+			details.setClientSecret("restapp");
+			getClientDetailsService().addClientDetails(details);
+
+			details = new BaseClientDetails(
+					"felix_mobile_application",
+					null,
+					"read,write,trust",
+					"password,authorization_code,refresh_token,implicit",
+					"ROLE_APP");
+			details.setClientSecret("felix_mobile_application");
+			getClientDetailsService().addClientDetails(details);
+
+			details = new BaseClientDetails(
+					"felix_desktop_application", 
 					null, 
 					"read,write,trust", 
 					"password,authorization_code,refresh_token,implicit", 
 					"ROLE_APP");
-			details.setClientSecret("restapp");
+			details.setClientSecret("felix_desktop_application");
 			getClientDetailsService().addClientDetails(details);
 		}
 	}
