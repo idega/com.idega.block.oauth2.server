@@ -197,8 +197,19 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 		}
 
 		try {
-			if (LoginBusinessBean.getLoginBusinessBean(iwc).logInAsAnotherUser(iwc, user)) {
-				return user;
+			if (iwc.isLoggedOn()) {
+				com.idega.user.data.bean.User loggedInUser = iwc.getLoggedInUser();
+				if (loggedInUser != null && loggedInUser.getId().intValue() == user.getId().intValue()) {
+					return user;
+				}
+
+				if (LoginBusinessBean.getLoginBusinessBean(iwc).logInAsAnotherUser(iwc, user)) {
+					return user;
+				}
+			} else {
+				if (LoginBusinessBean.getLoginBusinessBean(iwc).logInUser(iwc.getRequest(), user)) {
+					return user;
+				}
 			}
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable to login in user " + user);
