@@ -41,5 +41,9 @@
 			<groupId>com.idega.block.platform</groupId>
 			<artifactId>com.idega.block.login</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>com.idega.block.addon</groupId>
+			<artifactId>com.idega.restful</artifactId>
+		</dependency>
 	</dependencies>
 </project>

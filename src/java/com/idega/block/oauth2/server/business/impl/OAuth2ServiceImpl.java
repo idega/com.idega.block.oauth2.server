@@ -82,6 +82,7 @@
  */
 package com.idega.block.oauth2.server.business.impl;
 
+import java.util.Collection;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -95,6 +96,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
+import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.stereotype.Service;
 
 import com.idega.block.login.business.OAuth2Service;
@@ -107,6 +111,7 @@ import com.idega.presentation.IWContext;
 import com.idega.servlet.filter.RequestResponseProvider;
 import com.idega.user.dao.UserDAO;
 import com.idega.util.CoreUtil;
+import com.idega.util.ListUtil;
 import com.idega.util.expression.ELUtil;
 
 /**
@@ -127,6 +132,27 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 
 	@Autowired
 	private UserDAO userDAO;
+
+	private LoginBusinessBean loginBusinessBean;
+
+	@Autowired
+	private TokenStore tokenStore;
+
+	private LoginBusinessBean getLoginBusinessBean() {
+		if (this.loginBusinessBean == null) {
+			this.loginBusinessBean = LoginBusinessBean.getDefaultLoginBusinessBean();
+		}
+
+		return this.loginBusinessBean;
+	}
+
+	private TokenStore getTokenStore() {
+		if (this.tokenStore == null) {
+			ELUtil.getInstance().autowire(this);
+		}
+
+		return this.tokenStore;
+	}
 
 	private UserDAO getUserDAO() {
 		if (this.userDAO == null) {
@@ -216,5 +242,41 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 		}
 
 		return null;
+	}
+
+	@Override
+	public boolean logoutUser() {
+		com.idega.user.data.bean.User user = getAuthenticatedUser();
+		if (user != null) {
+			SecurityContext securityContext = SecurityContextHolder.getContext();
+			if (securityContext == null) {
+				throw new IllegalStateException("User is not logged in!");
+			}
+
+			OAuth2Authentication authentication = (OAuth2Authentication) securityContext.getAuthentication();
+			if (authentication == null) {
+				throw new IllegalStateException(
+						"Failed to get authentication info from security context");
+			}
+
+			User principal = (User) authentication.getPrincipal();
+			if (principal == null) {
+				throw new IllegalStateException(
+						"Failed to get user from security context");
+			}
+
+			Collection<OAuth2AccessToken> tokens = getTokenStore().findTokensByClientIdAndUserName(
+					authentication.getOAuth2Request().getClientId(), 
+					principal.getUsername());
+			if (!ListUtil.isEmpty(tokens)) {
+				for (OAuth2AccessToken token : tokens) {
+					getTokenStore().removeAccessToken(token);
+				}
+			}
+
+			return getLoginBusinessBean().logOutUser(CoreUtil.getIWContext());
+		}
+
+		return true;
 	}
 }
