@@ -229,11 +229,12 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 					return user;
 				}
 
-				if (LoginBusinessBean.getLoginBusinessBean(iwc).logInAsAnotherUser(iwc, user)) {
+				if (LoginBusinessBean.getLoginBusinessBean(iwc.getRequest()).logInAsAnotherUser(iwc, user)) {
 					return user;
 				}
 			} else {
-				if (LoginBusinessBean.getLoginBusinessBean(iwc).logInUser(iwc.getRequest(), user)) {
+				HttpServletRequest request = iwc.getRequest();
+				if (LoginBusinessBean.getLoginBusinessBean(request).logInUser(request, user)) {
 					return user;
 				}
 			}
@@ -266,7 +267,7 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 			}
 
 			Collection<OAuth2AccessToken> tokens = getTokenStore().findTokensByClientIdAndUserName(
-					authentication.getOAuth2Request().getClientId(), 
+					authentication.getOAuth2Request().getClientId(),
 					principal.getUsername());
 			if (!ListUtil.isEmpty(tokens)) {
 				for (OAuth2AccessToken token : tokens) {
