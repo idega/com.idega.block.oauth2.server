@@ -82,13 +82,11 @@
  */
 package com.idega.block.oauth2.server.controller;
 
-import java.util.Arrays;
-import java.util.List;
-
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.ResponseBody;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 /**
  * <p>A controller for testing OAuth service</p>
@@ -98,13 +96,12 @@ import org.springframework.web.bind.annotation.ResponseBody;
  * @version 1.0.0 2015 spal. 19
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
-@Controller
-@RequestMapping("/api/test")
+@Path("test")
+@Produces({ MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON })
 public class RestController {
 
-	@RequestMapping(value = "/", method = RequestMethod.GET)
-	@ResponseBody
-	public List<String> list() {
-		return Arrays.asList("test1", "test2", "test3");
+	@GET
+	public Response list() {
+		return Response.ok().build();
 	}
 }
