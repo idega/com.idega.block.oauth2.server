@@ -234,6 +234,54 @@
 	</security:http>
 
 	<security:http
+		pattern="/central/**"
+		create-session="never"
+		entry-point-ref="oauthAuthenticationEntryPoint"
+		access-decision-manager-ref="accessDecisionManager"
+		xmlns="http://www.springframework.org/schema/security">
+		<security:anonymous enabled="false" />
+		<security:intercept-url
+			pattern="/central/**"
+			access="ROLE_APP" />
+		<security:custom-filter
+			ref="resourceServerFilter"
+			before="PRE_AUTH_FILTER" />
+		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
+	</security:http>
+
+	<security:http
+		pattern="/parents/**"
+		create-session="never"
+		entry-point-ref="oauthAuthenticationEntryPoint"
+		access-decision-manager-ref="accessDecisionManager"
+		xmlns="http://www.springframework.org/schema/security">
+		<security:anonymous enabled="false" />
+		<security:intercept-url
+			pattern="/parents/**"
+			access="ROLE_APP" />
+		<security:custom-filter
+			ref="resourceServerFilter"
+			before="PRE_AUTH_FILTER" />
+		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
+	</security:http>
+
+	<security:http
+		pattern="/trainer/**"
+		create-session="never"
+		entry-point-ref="oauthAuthenticationEntryPoint"
+		access-decision-manager-ref="accessDecisionManager"
+		xmlns="http://www.springframework.org/schema/security">
+		<security:anonymous enabled="false" />
+		<security:intercept-url
+			pattern="/trainer/**"
+			access="ROLE_APP" />
+		<security:custom-filter
+			ref="resourceServerFilter"
+			before="PRE_AUTH_FILTER" />
+		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
+	</security:http>
+
+	<!-- <security:http
 		pattern="/mobile/**"
 		create-session="never"
 		entry-point-ref="oauthAuthenticationEntryPoint"
@@ -247,7 +295,7 @@
 			ref="resourceServerFilter"
 			before="PRE_AUTH_FILTER" />
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
-	</security:http>
+	</security:http> -->
 
 	<security:http
 		pattern="/token/**"
