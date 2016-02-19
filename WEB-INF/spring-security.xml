@@ -30,10 +30,12 @@
 			value="javax.sql.DataSource" />
 	</bean>
 
-	<!-- <bean
+	<!-- 
+	<bean
 		id="oauth2Service"
 		class="com.idega.block.oauth2.server.business.impl.OAuth2ServiceImpl" >
-	</bean> -->
+	</bean> 
+	-->
 
 	<!-- This defined token store, we have used inmemory tokenstore for now 
 		but this can be changed to a user defined one -->
@@ -215,6 +217,8 @@
 		</constructor-arg>
 	</bean>
 
+	<security:http pattern="/api/afterschoolcare/**" security="none" auto-config="true"/>
+
 	<!-- This is where we tells spring security what URL should be protected 
 		and what roles have access to them -->
 	<security:http
@@ -232,6 +236,7 @@
 			before="PRE_AUTH_FILTER" />
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
 	</security:http>
+
 
 	<security:http
 		pattern="/central/**"
