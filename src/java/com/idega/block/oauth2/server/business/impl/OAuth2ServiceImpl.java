@@ -135,7 +135,7 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 
 	private LoginBusinessBean loginBusinessBean;
 
-	@Autowired
+	@Autowired(required = false)
 	private TokenStore tokenStore;
 
 	private LoginBusinessBean getLoginBusinessBean() {

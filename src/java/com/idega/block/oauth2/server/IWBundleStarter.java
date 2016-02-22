@@ -103,7 +103,7 @@ import com.idega.util.expression.ELUtil;
  */
 public class IWBundleStarter implements IWBundleStartable {
 
-	@Autowired
+	@Autowired(required=false)
 	@Qualifier("clientDetails")
 	private JdbcClientDetailsService clientDetailsService;
 
@@ -130,7 +130,7 @@ public class IWBundleStarter implements IWBundleStartable {
 	public void start(IWBundle starterBundle) {
 		getOAuth2DAO().checkTables();
 		
-		if (ListUtil.isEmpty(getClientDetailsService().listClientDetails())) {
+		if (getClientDetailsService() != null && ListUtil.isEmpty(getClientDetailsService().listClientDetails())) {
 			BaseClientDetails details = new BaseClientDetails(
 					"restapp",
 					null,
