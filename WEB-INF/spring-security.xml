@@ -347,8 +347,8 @@
 				ref="idegaEncoder"/>
 			<security:jdbc-user-service 
 				data-source-ref="dataSource"
-				authorities-by-username-query="SELECT icl.user_login AS 'username', CASE WHEN icli.account_enabled = 'Y' THEN 'ROLE_APP' ELSE 'ROLE_APP' END AS 'authority' FROM ic_login icl JOIN ic_login_info icli ON icli.ic_login_id = icl.ic_login_id WHERE icl.user_login = ?"
-				users-by-username-query="SELECT icl.user_login AS 'username', usr_password AS 'password', CASE WHEN icli.account_enabled = 'Y' THEN TRUE ELSE FALSE END AS 'enabled' FROM ic_login icl JOIN ic_login_info icli ON icli.ic_login_id = icl.ic_login_id WHERE icl.user_login = ?"
+				authorities-by-username-query="SELECT icl.user_login AS username, CASE WHEN icli.account_enabled = 'Y' THEN 'ROLE_APP' ELSE 'ROLE_APP' END AS authority FROM ic_login icl, ic_login_info icli where icli.ic_login_id = icl.ic_login_id and icl.user_login = ?"
+				users-by-username-query="SELECT icl.user_login as username, icl.usr_password as password, CASE WHEN icli.account_enabled = 'Y' THEN 1 ELSE 0 END as enabled FROM ic_login icl, ic_login_info icli where icli.ic_login_id = icl.ic_login_id and icl.user_login = ?"
 			/>
 		</security:authentication-provider>
 	</security:authentication-manager>
