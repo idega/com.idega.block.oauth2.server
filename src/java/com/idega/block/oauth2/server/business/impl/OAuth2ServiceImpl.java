@@ -82,15 +82,19 @@
  */
 package com.idega.block.oauth2.server.business.impl;
 
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.Collection;
+import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.ejb.FinderException;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.core.MediaType;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Scope;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
@@ -101,18 +105,25 @@ import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.stereotype.Service;
 
+import com.idega.block.login.bean.OAuthToken;
 import com.idega.block.login.business.OAuth2Service;
 import com.idega.core.accesscontrol.business.LoginBusinessBean;
 import com.idega.core.accesscontrol.data.LoginTable;
 import com.idega.core.accesscontrol.data.LoginTableHome;
+import com.idega.core.accesscontrol.event.LoggedInUserCredentials;
+import com.idega.core.business.DefaultSpringBean;
 import com.idega.data.IDOLookup;
 import com.idega.data.IDOLookupException;
 import com.idega.presentation.IWContext;
 import com.idega.servlet.filter.RequestResponseProvider;
 import com.idega.user.dao.UserDAO;
+import com.idega.util.CoreConstants;
 import com.idega.util.CoreUtil;
 import com.idega.util.ListUtil;
+import com.idega.util.StringUtil;
 import com.idega.util.expression.ELUtil;
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.WebResource;
 
 /**
  * <p>Static class for managing users of OAuth2</p>
@@ -124,9 +135,7 @@ import com.idega.util.expression.ELUtil;
  */
 @Service("oauth2Service")
 @Scope(BeanDefinition.SCOPE_SINGLETON)
-public class OAuth2ServiceImpl implements OAuth2Service {
-
-	private static final Logger LOGGER = Logger.getLogger(OAuth2ServiceImpl.class.getName());
+public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Service, ApplicationListener<LoggedInUserCredentials> {
 
 	private LoginTableHome loginTableHome;
 
@@ -167,9 +176,7 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 			try {
 				loginTableHome = (LoginTableHome) IDOLookup.getHome(LoginTable.class);
 			} catch (IDOLookupException e) {
-				LOGGER.log(Level.WARNING,
-						"Failed to get " + LoginTableHome.class +
-						" cause of: ", e);
+				getLogger().log(Level.WARNING, "Failed to get " + LoginTableHome.class.getName(), e);
 			}
 		}
 
@@ -279,5 +286,95 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 		}
 
 		return true;
+	}
+
+	@Override
+	public OAuthToken getToken(String serverURL, String clientId, String clientSecret, String username, String password) {
+		if (StringUtil.isEmpty(serverURL)) {
+			return null;
+		}
+ 		if (StringUtil.isEmpty(username)) {
+			return null;
+		}
+		if (StringUtil.isEmpty(password)) {
+			return null;
+		}
+
+		if (StringUtil.isEmpty(clientId)) {
+			clientId = getApplicationProperty("oauth_default_client_id");
+		}
+		if (StringUtil.isEmpty(clientId)) {
+			getLogger().warning("Client ID is unknown");
+			return null;
+		}
+		if (StringUtil.isEmpty(clientSecret)) {
+			clientSecret = getApplicationProperty("oauth_default_client_secret");
+		}
+		if (StringUtil.isEmpty(clientSecret)) {
+			getLogger().warning("Client secret is unknown");
+			return null;
+		}
+
+		OAuthToken token = null;
+		try {
+			username = URLDecoder.decode(username, CoreConstants.ENCODING_UTF8);
+			password = URLDecoder.decode(password, CoreConstants.ENCODING_UTF8);
+
+			Client client = new Client();
+
+			if (!serverURL.endsWith(CoreConstants.SLASH)) {
+				serverURL = serverURL.concat(CoreConstants.SLASH);
+			}
+			WebResource webResource = client.resource(serverURL + "authentication/oauth/token");
+			webResource = webResource
+						.queryParam("grant_type", "password")
+						.queryParam("client_id", clientId)
+						.queryParam("client_secret", clientSecret)
+						.queryParam("username", URLEncoder.encode(username, CoreConstants.ENCODING_UTF8))
+						.queryParam("password", URLEncoder.encode(password, CoreConstants.ENCODING_UTF8));
+			WebResource.Builder builder = webResource.accept(MediaType.APPLICATION_JSON);
+			token = builder.post(OAuthToken.class);
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error logging in user with username: " + username, e);
+			return null;
+		}
+
+		if (token == null || StringUtil.isEmpty(token.getAccess_token())) {
+			getLogger().warning("Error getting authentication token for username " + username);
+			return null;
+		}
+
+		return token;
+	}
+
+	@Override
+	public void onApplicationEvent(LoggedInUserCredentials credentials) {
+		if (credentials == null) {
+			return;
+		}
+
+		if (!getSettings().getBoolean("oauth_auto_create_token", Boolean.FALSE)) {
+			return;
+		}
+
+		String username = credentials.getUserName();
+		OAuthToken token = getToken(credentials.getServerURL(), null, null, username, credentials.getPassword());
+		if (token != null) {
+			getCache().put(username, token);
+		}
+	}
+
+	private Map<String, OAuthToken> getCache() {
+		Map<String, OAuthToken> cache = getCache("oauth2AccessTokensForUserNames", 604800, 604800, Integer.MAX_VALUE, false);
+		return cache;
+	}
+
+	@Override
+	public OAuthToken getToken(String username) {
+		if (StringUtil.isEmpty(username)) {
+			return null;
+		}
+
+		return getCache().get(username);
 	}
 }
