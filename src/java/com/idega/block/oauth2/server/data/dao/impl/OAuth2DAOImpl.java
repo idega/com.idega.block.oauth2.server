@@ -133,7 +133,7 @@ public class OAuth2DAOImpl implements OAuth2DAO {
 		.append("    authorities VARCHAR(256),")
 		.append("    access_token_validity INTEGER,")
 		.append("    refresh_token_validity INTEGER,")
-		.append("    additional_information VARCHAR(4096),")
+		.append("    additional_information VARCHAR(4000),")
 		.append("    autoapprove VARCHAR(256)")
 		.append(");");
 
@@ -221,7 +221,7 @@ public class OAuth2DAOImpl implements OAuth2DAO {
 		.append("    authorities VARCHAR(256),")
 		.append("    access_token_validity INTEGER,")
 		.append("    refresh_token_validity INTEGER,")
-		.append("    additionalInformation VARCHAR(4096),")
+		.append("    additionalInformation VARCHAR(4000),")
 		.append("    autoApproveScopes VARCHAR(256)")
 		.append(");");
 
@@ -230,8 +230,7 @@ public class OAuth2DAOImpl implements OAuth2DAO {
 
 	/**
 	 * 
-	 * @return names of existng tables with pattern oauth_*
-	 * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
+	 * @return names of existing tables with pattern oauth_*
 	 */
 	private List<String> getTableNames() {
 		Connection connection = null;
