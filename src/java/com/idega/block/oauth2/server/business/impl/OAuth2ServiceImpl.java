@@ -84,11 +84,19 @@ package com.idega.block.oauth2.server.business.impl;
 
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.Map;
 import java.util.logging.Level;
 
 import javax.ejb.FinderException;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 
@@ -120,10 +128,14 @@ import com.idega.user.dao.UserDAO;
 import com.idega.util.CoreConstants;
 import com.idega.util.CoreUtil;
 import com.idega.util.ListUtil;
+import com.idega.util.StringHandler;
 import com.idega.util.StringUtil;
 import com.idega.util.expression.ELUtil;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.config.ClientConfig;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
+import com.sun.jersey.client.urlconnection.HTTPSProperties;
 
 /**
  * <p>Static class for managing users of OAuth2</p>
@@ -288,6 +300,18 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		return true;
 	}
 
+	private String getURL(String serverURL) {
+		if (!serverURL.endsWith(CoreConstants.SLASH)) {
+			serverURL = serverURL.concat(CoreConstants.SLASH);
+		}
+
+		String url = serverURL.concat("authentication/oauth/token");
+		if (url.startsWith("https") && getSettings().getBoolean("oauth.switch_to_http", Boolean.FALSE)) {
+			url = StringHandler.replace(url, "https:", "http:");
+		}
+		return url;
+	}
+
 	@Override
 	public OAuthToken getToken(String serverURL, String clientId, String clientSecret, String username, String password) {
 		if (StringUtil.isEmpty(serverURL)) {
@@ -316,16 +340,14 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		}
 
 		OAuthToken token = null;
+		WebResource webResource = null;
 		try {
 			username = URLDecoder.decode(username, CoreConstants.ENCODING_UTF8);
 			password = URLDecoder.decode(password, CoreConstants.ENCODING_UTF8);
 
-			Client client = new Client();
-
-			if (!serverURL.endsWith(CoreConstants.SLASH)) {
-				serverURL = serverURL.concat(CoreConstants.SLASH);
-			}
-			WebResource webResource = client.resource(serverURL + "authentication/oauth/token");
+			String url = getURL(serverURL);
+			Client client = getClient(url);
+			webResource = client.resource(url);
 			webResource = webResource
 						.queryParam("grant_type", "password")
 						.queryParam("client_id", clientId)
@@ -335,16 +357,62 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 			WebResource.Builder builder = webResource.accept(MediaType.APPLICATION_JSON);
 			token = builder.post(OAuthToken.class);
 		} catch (Exception e) {
-			getLogger().log(Level.WARNING, "Error logging in user with username: " + username, e);
+			getLogger().log(Level.WARNING, "Error logging in user with username: " + username + ". Web resource: " + webResource, e);
 			return null;
 		}
 
 		if (token == null || StringUtil.isEmpty(token.getAccess_token())) {
-			getLogger().warning("Error getting authentication token for username " + username);
+			getLogger().warning("Error getting authentication token for username " + username + ". Web resource: " + webResource);
 			return null;
 		}
 
 		return token;
+	}
+
+	private boolean isAllowedToAcceptAllCertificates(String url) {
+		return !StringUtil.isEmpty(url) && url.startsWith("https") &&
+				getSettings().getBoolean("oauth.accept_all_cert", Boolean.FALSE);
+	}
+
+	private Client getClient(String url) {
+		if (isAllowedToAcceptAllCertificates(url)) {
+			//	Create a trust manager that does not validate certificate chains
+			TrustManager[] trustAllCerts = new TrustManager[] {
+				new X509TrustManager() {
+				    @Override
+					public X509Certificate[] getAcceptedIssuers() {
+				    	return null;
+				    }
+				    @Override
+					public void checkClientTrusted(X509Certificate[] certs, String authType) {}
+				    @Override
+					public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+				}
+			};
+
+			//	Install the all-trusting trust manager
+			SSLContext sc = null;
+			try {
+			    sc = SSLContext.getInstance("TLS");
+			    sc.init(null, trustAllCerts, new SecureRandom());
+			    HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+			} catch (Exception e) {}
+
+			ClientConfig config = new DefaultClientConfig();
+			config.getProperties().put(HTTPSProperties.PROPERTY_HTTPS_PROPERTIES, new HTTPSProperties(
+					new HostnameVerifier() {
+						@Override
+						public boolean verify( String s, SSLSession sslSession ) {
+							return true;
+						}
+					}, sc
+				)
+			);
+			Client client = Client.create(config);
+			return client;
+		} else {
+			return new Client();
+		}
 	}
 
 	@Override
