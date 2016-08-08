@@ -138,16 +138,21 @@ import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.client.urlconnection.HTTPSProperties;
 
 /**
- * <p>Static class for managing users of OAuth2</p>
- * <p>You can report about problems to:
- * <a href="mailto:martynas@idega.is">Martynas Stakė</a></p>
+ * <p>
+ * Static class for managing users of OAuth2
+ * </p>
+ * <p>
+ * You can report about problems to: <a href="mailto:martynas@idega.is">Martynas
+ * Stakė</a>
+ * </p>
  *
  * @version 1.0.0 2015 spal. 30
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
 @Service("oauth2Service")
 @Scope(BeanDefinition.SCOPE_SINGLETON)
-public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Service, ApplicationListener<LoggedInUserCredentials> {
+public class OAuth2ServiceImpl extends DefaultSpringBean
+		implements OAuth2Service, ApplicationListener<LoggedInUserCredentials> {
 
 	private LoginTableHome loginTableHome;
 
@@ -197,6 +202,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 	/*
 	 * (non-Javadoc)
+	 *
 	 * @see com.idega.core.business.OAuth2Service#getAuthenticatedUser()
 	 */
 	@Override
@@ -208,23 +214,32 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 		Authentication authentication = securityContext.getAuthentication();
 		if (authentication == null) {
-			throw new IllegalStateException(
-					"Failed to get authentication info from security context");
+			throw new IllegalStateException("Failed to get authentication info from security context");
 		}
 
-		User principal = (User) authentication.getPrincipal();
-		if (principal == null) {
-			throw new IllegalStateException(
-					"Failed to get user from security context");
+		Object rawPrincipal = authentication.getPrincipal();
+		if (rawPrincipal == null) {
+			throw new IllegalStateException("Failed to get user from security context");
+		}
+
+		String login = null;
+		if (rawPrincipal instanceof User) {
+			User principal = (User) authentication.getPrincipal();
+			if (principal == null) {
+				throw new IllegalStateException("Failed to get user from security context");
+			}
+			login = principal.getUsername();
+		} else if (rawPrincipal instanceof String) {
+			login = (String) rawPrincipal;
+		} else {
+			throw new IllegalStateException("Failed to get user from security context");
 		}
 
 		LoginTable loginTable = null;
 		try {
-			loginTable = getLoginTableHome().findByLogin(principal.getUsername());
+			loginTable = getLoginTableHome().findByLogin(login);
 		} catch (FinderException e) {
-			throw new IllegalStateException(
-					"User by login name " + principal.getUsername() +
-					" was not found");
+			throw new IllegalStateException("User by login name " + login + " was not found");
 		}
 
 		com.idega.user.data.bean.User user = getUserDAO().getUser(loginTable.getUserId());
@@ -237,7 +252,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 				HttpServletRequest request = requestProvider.getRequest();
 				iwc = new IWContext(request, requestProvider.getResponse(), request.getServletContext());
 			} catch (Exception e) {
-				throw new IllegalStateException("Failed to create context for user " + principal.getUsername());
+				throw new IllegalStateException("Failed to create context for user " + login);
 			}
 		}
 
@@ -275,19 +290,29 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 			OAuth2Authentication authentication = (OAuth2Authentication) securityContext.getAuthentication();
 			if (authentication == null) {
-				throw new IllegalStateException(
-						"Failed to get authentication info from security context");
+				throw new IllegalStateException("Failed to get authentication info from security context");
 			}
 
-			User principal = (User) authentication.getPrincipal();
-			if (principal == null) {
-				throw new IllegalStateException(
-						"Failed to get user from security context");
+			Object rawPrincipal = authentication.getPrincipal();
+			if (rawPrincipal == null) {
+				throw new IllegalStateException("Failed to get user from security context");
 			}
 
-			Collection<OAuth2AccessToken> tokens = getTokenStore().findTokensByClientIdAndUserName(
-					authentication.getOAuth2Request().getClientId(),
-					principal.getUsername());
+			String login = null;
+			if (rawPrincipal instanceof User) {
+				User principal = (User) authentication.getPrincipal();
+				if (principal == null) {
+					throw new IllegalStateException("Failed to get user from security context");
+				}
+				login = principal.getUsername();
+			} else if (rawPrincipal instanceof String) {
+				login = (String) rawPrincipal;
+			} else {
+				throw new IllegalStateException("Failed to get user from security context");
+			}
+
+			Collection<OAuth2AccessToken> tokens = getTokenStore()
+					.findTokensByClientIdAndUserName(authentication.getOAuth2Request().getClientId(), login);
 			if (!ListUtil.isEmpty(tokens)) {
 				for (OAuth2AccessToken token : tokens) {
 					getTokenStore().removeAccessToken(token);
@@ -313,11 +338,12 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	}
 
 	@Override
-	public OAuthToken getToken(String serverURL, String clientId, String clientSecret, String username, String password) {
+	public OAuthToken getToken(String serverURL, String clientId, String clientSecret, String username,
+			String password) {
 		if (StringUtil.isEmpty(serverURL)) {
 			return null;
 		}
- 		if (StringUtil.isEmpty(username)) {
+		if (StringUtil.isEmpty(username)) {
 			return null;
 		}
 		if (StringUtil.isEmpty(password)) {
@@ -348,21 +374,21 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 			String url = getURL(serverURL);
 			Client client = getClient(url);
 			webResource = client.resource(url);
-			webResource = webResource
-						.queryParam("grant_type", "password")
-						.queryParam("client_id", clientId)
-						.queryParam("client_secret", clientSecret)
-						.queryParam("username", URLEncoder.encode(username, CoreConstants.ENCODING_UTF8))
-						.queryParam("password", URLEncoder.encode(password, CoreConstants.ENCODING_UTF8));
+			webResource = webResource.queryParam("grant_type", "password").queryParam("client_id", clientId)
+					.queryParam("client_secret", clientSecret)
+					.queryParam("username", URLEncoder.encode(username, CoreConstants.ENCODING_UTF8))
+					.queryParam("password", URLEncoder.encode(password, CoreConstants.ENCODING_UTF8));
 			WebResource.Builder builder = webResource.accept(MediaType.APPLICATION_JSON);
 			token = builder.post(OAuthToken.class);
 		} catch (Exception e) {
-			getLogger().log(Level.WARNING, "Error logging in user with username: " + username + ". Web resource: " + webResource, e);
+			getLogger().log(Level.WARNING,
+					"Error logging in user with username: " + username + ". Web resource: " + webResource, e);
 			return null;
 		}
 
 		if (token == null || StringUtil.isEmpty(token.getAccess_token())) {
-			getLogger().warning("Error getting authentication token for username " + username + ". Web resource: " + webResource);
+			getLogger().warning(
+					"Error getting authentication token for username " + username + ". Web resource: " + webResource);
 			return null;
 		}
 
@@ -370,44 +396,45 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	}
 
 	private boolean isAllowedToAcceptAllCertificates(String url) {
-		return !StringUtil.isEmpty(url) && url.startsWith("https") &&
-				getSettings().getBoolean("oauth.accept_all_cert", Boolean.FALSE);
+		return !StringUtil.isEmpty(url) && url.startsWith("https")
+				&& getSettings().getBoolean("oauth.accept_all_cert", Boolean.FALSE);
 	}
 
 	private Client getClient(String url) {
 		if (isAllowedToAcceptAllCertificates(url)) {
-			//	Create a trust manager that does not validate certificate chains
-			TrustManager[] trustAllCerts = new TrustManager[] {
-				new X509TrustManager() {
-				    @Override
-					public X509Certificate[] getAcceptedIssuers() {
-				    	return null;
-				    }
-				    @Override
-					public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-				    @Override
-					public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+			// Create a trust manager that does not validate certificate chains
+			TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+				@Override
+				public X509Certificate[] getAcceptedIssuers() {
+					return null;
 				}
-			};
 
-			//	Install the all-trusting trust manager
+				@Override
+				public void checkClientTrusted(X509Certificate[] certs, String authType) {
+				}
+
+				@Override
+				public void checkServerTrusted(X509Certificate[] certs, String authType) {
+				}
+			} };
+
+			// Install the all-trusting trust manager
 			SSLContext sc = null;
 			try {
-			    sc = SSLContext.getInstance("TLS");
-			    sc.init(null, trustAllCerts, new SecureRandom());
-			    HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-			} catch (Exception e) {}
+				sc = SSLContext.getInstance("TLS");
+				sc.init(null, trustAllCerts, new SecureRandom());
+				HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+			} catch (Exception e) {
+			}
 
 			ClientConfig config = new DefaultClientConfig();
-			config.getProperties().put(HTTPSProperties.PROPERTY_HTTPS_PROPERTIES, new HTTPSProperties(
-					new HostnameVerifier() {
+			config.getProperties().put(HTTPSProperties.PROPERTY_HTTPS_PROPERTIES,
+					new HTTPSProperties(new HostnameVerifier() {
 						@Override
-						public boolean verify( String s, SSLSession sslSession ) {
+						public boolean verify(String s, SSLSession sslSession) {
 							return true;
 						}
-					}, sc
-				)
-			);
+					}, sc));
 			Client client = Client.create(config);
 			return client;
 		} else {
@@ -433,7 +460,8 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	}
 
 	private Map<String, OAuthToken> getCache() {
-		Map<String, OAuthToken> cache = getCache("oauth2AccessTokensForUserNames", 604800, 604800, Integer.MAX_VALUE, false);
+		Map<String, OAuthToken> cache = getCache("oauth2AccessTokensForUserNames", 604800, 604800, Integer.MAX_VALUE,
+				false);
 		return cache;
 	}
 

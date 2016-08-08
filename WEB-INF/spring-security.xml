@@ -337,6 +337,10 @@
 		id="idegaEncoder" 
 		class="com.idega.block.oauth2.server.configuration.IdegaPasswordEncoder"/>
 
+	<bean 
+		id="internalAuthenticationProvider" 
+		class="com.idega.block.oauth2.server.configuration.InternalAuthenticationProvider"/>
+
 	<!-- This is simple authentication manager, with a hardcoded user/password 
 		combination. We can replace this with a user defined service to get few users 
 		credentials from DB -->
@@ -350,6 +354,8 @@
 				authorities-by-username-query="SELECT icl.user_login AS username, CASE WHEN icli.account_enabled = 'Y' THEN 'ROLE_APP' ELSE 'ROLE_APP' END AS authority FROM ic_login icl, ic_login_info icli where icli.ic_login_id = icl.ic_login_id and icl.user_login = ?"
 				users-by-username-query="SELECT icl.user_login as username, icl.usr_password as password, CASE WHEN icli.account_enabled = 'Y' THEN 1 ELSE 0 END as enabled FROM ic_login icl, ic_login_info icli where icli.ic_login_id = icl.ic_login_id and icl.user_login = ?"
 			/>
+		</security:authentication-provider>
+		<security:authentication-provider ref = "internalAuthenticationProvider">
 		</security:authentication-provider>
 	</security:authentication-manager>
 

@@ -105,13 +105,13 @@ import com.idega.util.Encrypter;
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
 @Scope(BeanDefinition.SCOPE_SINGLETON)
-@Service("idegaEncoder")
-public class IdegaPasswordEncoder implements PasswordEncoder {
+@Service("idegaEncoderInternal")
+public class IdegaPasswordEncoderInternal implements PasswordEncoder {
 
 	@Autowired
 	private UserLoginDAO userLoginDAO;
 
-	public IdegaPasswordEncoder() {
+	public IdegaPasswordEncoderInternal() {
 	}
 
 	/*
