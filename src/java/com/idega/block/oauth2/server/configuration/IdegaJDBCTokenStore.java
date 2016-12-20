@@ -113,26 +113,26 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 	 */
 	@Override
 	public void storeAccessToken(OAuth2AccessToken token, OAuth2Authentication authentication) {
-		LOCK.lock();
+		boolean isSaved = Boolean.FALSE;
+		do {
+			LOCK.lock();
 
-		try {
-			super.storeAccessToken(token, authentication);
-		} catch (DuplicateKeyException e) {
-			Logger.getLogger(IdegaJDBCTokenStore.class.getName()).log(
-					Level.WARNING,
-					"Failed to store access token (" + token.getValue() + ", refresh token: " + token.getRefreshToken().getValue() + ") due to duplicate key error, trying one more time",
-					e
-			);
-			reTry(token, authentication);
-		} finally {
-			LOCK.unlock();
-		}
-	}
-
-	private void reTry(OAuth2AccessToken token, OAuth2Authentication authentication) {
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {}
-		storeAccessToken(token, authentication);
+			try {
+				super.storeAccessToken(token, authentication);
+				isSaved = Boolean.TRUE;
+			} catch (DuplicateKeyException e) {
+				Logger.getLogger(IdegaJDBCTokenStore.class.getName()).log(
+						Level.WARNING,
+						"Failed to store access token (" + token.getValue() + ", refresh token: " + token.getRefreshToken().getValue() + ") due to duplicate key error, trying one more time",
+						e
+				);
+				
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e1) {}
+			} finally {
+				LOCK.unlock();
+			}
+		} while (!isSaved);
 	}
 }
