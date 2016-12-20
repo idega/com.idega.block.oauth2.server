@@ -82,6 +82,8 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -99,6 +101,8 @@ import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
  */
 public class IdegaJDBCTokenStore extends JdbcTokenStore {
 
+	private static final Lock LOCK = new ReentrantLock();
+	
 	public IdegaJDBCTokenStore(DataSource dataSource) {
 		super(dataSource);
 	}
@@ -109,6 +113,8 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 	 */
 	@Override
 	public void storeAccessToken(OAuth2AccessToken token, OAuth2Authentication authentication) {
+		LOCK.lock();
+		
 		try {
 			super.storeAccessToken(token, authentication);
 		} catch (DuplicateKeyException e) {
@@ -116,6 +122,8 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 					Level.WARNING, 
 					"Failed to store access token due to duplicate token error, trying once more, cause: ", e);
 			storeAccessToken(token, authentication);
+		} finally {
+			LOCK.unlock();
 		}
 	}
 }
