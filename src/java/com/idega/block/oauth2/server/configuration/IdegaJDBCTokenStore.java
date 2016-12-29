@@ -101,10 +101,15 @@ import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
  */
 public class IdegaJDBCTokenStore extends JdbcTokenStore {
 
+	public static final String ACCESS_TOKEN_INSERT_STATEMENT = "replace into oauth_access_token (token_id, token, authentication_id, user_name, client_id, authentication, refresh_token) values (?, ?, ?, ?, ?, ?, ?)";
+	public static final String REFRESH_TOKEN_INSERT_STATEMENT = "replace into oauth_refresh_token (token_id, token, authentication) values (?, ?, ?)";
+
 	private static final Lock LOCK = new ReentrantLock();
 
 	public IdegaJDBCTokenStore(DataSource dataSource) {
 		super(dataSource);
+		setInsertAccessTokenSql(ACCESS_TOKEN_INSERT_STATEMENT);
+		setInsertRefreshTokenSql(REFRESH_TOKEN_INSERT_STATEMENT);
 	}
 
 	/*
