@@ -82,8 +82,6 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -104,8 +102,6 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 	public static final String ACCESS_TOKEN_INSERT_STATEMENT = "replace into oauth_access_token (token_id, token, authentication_id, user_name, client_id, authentication, refresh_token) values (?, ?, ?, ?, ?, ?, ?)";
 	public static final String REFRESH_TOKEN_INSERT_STATEMENT = "replace into oauth_refresh_token (token_id, token, authentication) values (?, ?, ?)";
 
-	private static final Lock LOCK = new ReentrantLock();
-
 	public IdegaJDBCTokenStore(DataSource dataSource) {
 		super(dataSource);
 		setInsertAccessTokenSql(ACCESS_TOKEN_INSERT_STATEMENT);
@@ -118,26 +114,23 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 	 */
 	@Override
 	public void storeAccessToken(OAuth2AccessToken token, OAuth2Authentication authentication) {
-		boolean isSaved = Boolean.FALSE;
+		boolean saved = Boolean.FALSE;
 		do {
-			LOCK.lock();
-
 			try {
 				super.storeAccessToken(token, authentication);
-				isSaved = Boolean.TRUE;
+				saved = Boolean.TRUE;
 			} catch (DuplicateKeyException e) {
 				Logger.getLogger(IdegaJDBCTokenStore.class.getName()).log(
 						Level.WARNING,
-						"Failed to store access token (" + token.getValue() + ", refresh token: " + token.getRefreshToken().getValue() + ") due to duplicate key error, trying one more time",
+						"Failed to store access token (" + token.getValue() + ", refresh token: " + token.getRefreshToken().getValue() +
+						") due to duplicated key error, trying one more time. Authentication: " + authentication,
 						e
 				);
-				
+
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e1) {}
-			} finally {
-				LOCK.unlock();
 			}
-		} while (!isSaved);
+		} while (!saved);
 	}
 }
