@@ -167,6 +167,15 @@
 			name="requestFactory"
 			ref="oAuth2RequestFactory" />
 	</bean>
+	
+	<!-- Custom refresh token handler -->
+	<bean
+		id="idegaRefreshTokenGranter"
+		class="com.idega.block.oauth2.server.provider.refresh.IdegaRefreshTokenGranter">
+		<constructor-arg ref="tokenServices"/>
+		<constructor-arg ref="clientDetails"/>
+		<constructor-arg ref="oAuth2RequestFactory"/>
+	</bean>
 
 	<oauth:authorization-server
 		client-details-service-ref="clientDetails"
@@ -174,9 +183,9 @@
 		user-approval-handler-ref="userApprovalHandler">
 		<oauth:authorization-code />
 		<oauth:implicit />
-		<oauth:refresh-token />
 		<oauth:client-credentials />
 		<oauth:password />
+		<oauth:custom-grant token-granter-ref="idegaRefreshTokenGranter"/>
 	</oauth:authorization-server>
 
 	<!--
