@@ -311,11 +311,15 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 				throw new IllegalStateException("Failed to get user from security context");
 			}
 
+			String tokenValue = authentication.getOAuth2Request().getRequestParameters().get("access_token");
+
 			Collection<OAuth2AccessToken> tokens = getTokenStore()
 					.findTokensByClientIdAndUserName(authentication.getOAuth2Request().getClientId(), login);
 			if (!ListUtil.isEmpty(tokens)) {
 				for (OAuth2AccessToken token : tokens) {
-					getTokenStore().removeAccessToken(token);
+					if (token.getValue().equals(tokenValue)) {
+						getTokenStore().removeAccessToken(token);
+					}
 				}
 			}
 
