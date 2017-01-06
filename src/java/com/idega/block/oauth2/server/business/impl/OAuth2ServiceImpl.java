@@ -313,11 +313,18 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 
 			String tokenValue = authentication.getOAuth2Request().getRequestParameters().get("access_token");
 
-			Collection<OAuth2AccessToken> tokens = getTokenStore()
-					.findTokensByClientIdAndUserName(authentication.getOAuth2Request().getClientId(), login);
+			Collection<OAuth2AccessToken> tokens = getTokenStore().findTokensByClientIdAndUserName(authentication.getOAuth2Request().getClientId(), login);
 			if (!ListUtil.isEmpty(tokens)) {
 				for (OAuth2AccessToken token : tokens) {
-					if (token.getValue().equals(tokenValue)) {
+					boolean remove = false;
+
+					if (StringUtil.isEmpty(tokenValue)) {
+						remove = true;
+					} else if (tokenValue.equals(token.getValue())) {
+						remove = true;
+					}
+
+					if (remove) {
 						getTokenStore().removeAccessToken(token);
 					}
 				}
