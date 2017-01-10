@@ -86,7 +86,9 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
@@ -311,26 +313,40 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 				throw new IllegalStateException("Failed to get user from security context");
 			}
 
+			IWContext iwc = CoreUtil.getIWContext();
+
 			String tokenValue = authentication.getOAuth2Request().getRequestParameters().get("access_token");
+			if (StringUtil.isEmpty(tokenValue) && iwc != null) {
+				tokenValue = iwc.getParameter("access_token");
 
-			Collection<OAuth2AccessToken> tokens = getTokenStore().findTokensByClientIdAndUserName(authentication.getOAuth2Request().getClientId(), login);
-			if (!ListUtil.isEmpty(tokens)) {
-				for (OAuth2AccessToken token : tokens) {
-					boolean remove = false;
-
-					if (StringUtil.isEmpty(tokenValue)) {
-						remove = true;
-					} else if (tokenValue.equals(token.getValue())) {
-						remove = true;
-					}
-
-					if (remove) {
-						getTokenStore().removeAccessToken(token);
-					}
+				if (StringUtil.isEmpty(tokenValue)) {
+					String authorization = iwc.getAuthorizationHeader();
+					tokenValue = StringUtil.isEmpty(authorization) ? tokenValue : StringHandler.replace(authorization, "Bearer ", CoreConstants.EMPTY);
 				}
 			}
 
-			return getLoginBusinessBean().logOutUser(CoreUtil.getIWContext());
+			Collection<OAuth2AccessToken> tokens = getTokenStore().findTokensByClientIdAndUserName(
+					authentication.getOAuth2Request().getClientId(),
+					login
+			);
+			if (!ListUtil.isEmpty(tokens)) {
+				List<OAuth2AccessToken> tokensToRemove = new ArrayList<>();
+				for (OAuth2AccessToken token: tokens) {
+					if (StringUtil.isEmpty(tokenValue)) {
+						tokensToRemove.add(token);
+					} else if (tokenValue.equals(token.getValue())) {
+						tokensToRemove.add(token);
+						break;
+					}
+				}
+
+				getLogger().info("Tokens to remove: " + tokensToRemove + ", username: " + login + ", provided token: " + tokenValue);
+				for (OAuth2AccessToken token: tokensToRemove) {
+					getTokenStore().removeAccessToken(token);
+				}
+			}
+
+			return getLoginBusinessBean().logOutUser(iwc);
 		}
 
 		return true;
