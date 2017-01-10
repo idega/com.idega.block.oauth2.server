@@ -120,6 +120,11 @@
 		Configuring Token Services
 	-->
 
+	<bean 
+		id="tokenEnhancer"
+		class="com.idega.block.oauth2.server.configuration.IdegaTokenEnhancer">
+	</bean>
+
 	<!--
 		The final piece of configuration is to manage storage and retrieval of 
 		access tokens.
@@ -127,7 +132,7 @@
 		and other things. -->
 	<bean
 		id="tokenServices"
-		class="org.springframework.security.oauth2.provider.token.DefaultTokenServices">
+		class="com.idega.block.oauth2.server.configuration.IdegaDefaultTokenServices">
 		<property
 			name="tokenStore"
 			ref="tokenStore" />
@@ -140,6 +145,9 @@
 		<property
 			name="clientDetailsService"
 			ref="clientDetails" />
+		<property
+			name="tokenEnhancer"
+			ref="tokenEnhancer"/>
 	</bean>
 
 	<!--
