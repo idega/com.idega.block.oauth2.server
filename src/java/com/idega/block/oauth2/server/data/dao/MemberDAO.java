@@ -94,7 +94,7 @@ import com.idega.block.oauth2.server.data.Member;
  */
 public interface MemberDAO {
 	
-	static final String BEAN_NAME = "golfMemberDAO";
+	static final String BEAN_NAME = "oauthMemberDAO";
 
 	Member getMember(String username);
 }
