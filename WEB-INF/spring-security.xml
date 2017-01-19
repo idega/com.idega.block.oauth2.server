@@ -60,7 +60,7 @@
 	-->
 	<bean
 		id="clientDetailsUserService"
-		class="org.springframework.security.oauth2.provider.client.ClientDetailsUserDetailsService">
+		class="com.idega.block.oauth2.server.configuration.IdegaUserDetailsService">
 		<constructor-arg ref="clientDetails" />
 	</bean>
 	<security:authentication-manager
