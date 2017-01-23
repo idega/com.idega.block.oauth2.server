@@ -121,7 +121,7 @@
 	-->
 
 	<bean 
-		id="tokenEnhancer"
+		id="idegaTokenEnhancer"
 		class="com.idega.block.oauth2.server.configuration.IdegaTokenEnhancer">
 	</bean>
 
@@ -147,7 +147,7 @@
 			ref="clientDetails" />
 		<property
 			name="tokenEnhancer"
-			ref="tokenEnhancer"/>
+			ref="idegaTokenEnhancer"/>
 	</bean>
 
 	<!--
