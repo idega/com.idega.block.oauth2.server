@@ -132,6 +132,20 @@ public class IdegaDefaultTokenServices extends DefaultTokenServices {
 		return token;
 	}
 
+	@Transactional
+	public OAuth2AccessToken createDifferentAccessToken(OAuth2Authentication authentication, OAuth2RefreshToken refreshToken) throws AuthenticationException {
+		OAuth2AccessToken existingAccessToken = tokenStore.getAccessToken(authentication);
+		
+		OAuth2AccessToken accessToken = null;
+		if (authentication != null && refreshToken != null) {
+			do {
+				accessToken = createAccessToken(authentication, refreshToken);
+			} while(existingAccessToken != null && accessToken.getValue().equals(existingAccessToken.getValue()));
+		}
+
+		return accessToken;
+	}
+
 	/*
 	 * (non-Javadoc)
 	 * @see org.springframework.security.oauth2.provider.token.DefaultTokenServices#createAccessToken(org.springframework.security.oauth2.provider.OAuth2Authentication)
@@ -146,7 +160,7 @@ public class IdegaDefaultTokenServices extends DefaultTokenServices {
 		// the case that the old access token
 		// expired.
 		OAuth2RefreshToken refreshToken = createRefreshToken(authentication);
-		OAuth2AccessToken accessToken = createAccessToken(authentication, refreshToken);
+		OAuth2AccessToken accessToken = createDifferentAccessToken(authentication, refreshToken);
 		tokenStore.storeAccessToken(accessToken, authentication);
 		// In case it was modified
 		refreshToken = accessToken.getRefreshToken();
