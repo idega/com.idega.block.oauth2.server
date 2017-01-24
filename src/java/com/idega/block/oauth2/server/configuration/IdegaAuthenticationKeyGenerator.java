@@ -1,5 +1,5 @@
 /**
- * @(#)idegaDefaultTokenServices.java    1.0.0 13:39:58
+ * @(#)IdegaAuthenticationKeyGenerator.java    1.0.0 15:12:44
  *
  * Idega Software hf. Source Code Licence Agreement x
  *
@@ -82,97 +82,62 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
-import java.util.Date;
-import java.util.UUID;
+import java.io.UnsupportedEncodingException;
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.oauth2.common.DefaultExpiringOAuth2RefreshToken;
-import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
-import org.springframework.security.oauth2.common.DefaultOAuth2RefreshToken;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.common.OAuth2RefreshToken;
+import org.springframework.security.oauth2.common.util.OAuth2Utils;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
-import org.springframework.security.oauth2.provider.token.TokenStore;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.oauth2.provider.OAuth2Request;
+import org.springframework.security.oauth2.provider.token.AuthenticationKeyGenerator;
 
 /**
- * <p>You can report about problems to: 
- * <a href="mailto:martynas@idega.is">Martynas Stakė</a></p>
+ * <p>Generates authentication id for multiple browsers</p>
  *
- * @version 1.0.0 2017-01-10
+ * @version 1.0.0 2017-01-23
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
-public class IdegaDefaultTokenServices extends DefaultTokenServices {
+public class IdegaAuthenticationKeyGenerator implements AuthenticationKeyGenerator {
 
-	private TokenStore tokenStore = null;
+	private static final String CLIENT_ID = "client_id";
 
-	private OAuth2RefreshToken createRefreshToken(OAuth2Authentication authentication) {
-		if (!isSupportRefreshToken(authentication.getOAuth2Request())) {
-			return null;
-		}
-		int validitySeconds = getRefreshTokenValiditySeconds(authentication.getOAuth2Request());
-		String value = UUID.randomUUID().toString();
-		if (validitySeconds > 0) {
-			return new DefaultExpiringOAuth2RefreshToken(value, new Date(System.currentTimeMillis()
-					+ (validitySeconds * 1000L)));
-		}
-		return new DefaultOAuth2RefreshToken(value);
-	}
+	private static final String SCOPE = "scope";
 
-	private OAuth2AccessToken createAccessToken(OAuth2Authentication authentication, OAuth2RefreshToken refreshToken) {
-		DefaultOAuth2AccessToken token = new DefaultOAuth2AccessToken(UUID.randomUUID().toString());
-		int validitySeconds = getAccessTokenValiditySeconds(authentication.getOAuth2Request());
-		if (validitySeconds > 0) {
-			token.setExpiration(new Date(System.currentTimeMillis() + (validitySeconds * 1000L)));
-		}
-		token.setRefreshToken(refreshToken);
-		token.setScope(authentication.getOAuth2Request().getScope());
+	private static final String USERNAME = "username";
 
-		return token;
-	}
+	private static final String TIME = "time";
 
-	@Transactional
-	public OAuth2AccessToken createDifferentAccessToken(OAuth2Authentication authentication, OAuth2RefreshToken refreshToken) throws AuthenticationException {
-		OAuth2AccessToken existingAccessToken = tokenStore.getAccessToken(authentication);
-		
-		OAuth2AccessToken accessToken = null;
-		if (authentication != null && refreshToken != null) {
-			do {
-				accessToken = createAccessToken(authentication, refreshToken);
-			} while(existingAccessToken != null && accessToken.getValue().equals(existingAccessToken.getValue()));
+	public String extractKey(OAuth2Authentication authentication) {
+		Map<String, String> values = new LinkedHashMap<String, String>();
+
+		if (!authentication.isClientOnly()) {
+			values.put(USERNAME, authentication.getName());
 		}
 
-		return accessToken;
-	}
-
-	/*
-	 * (non-Javadoc)
-	 * @see org.springframework.security.oauth2.provider.token.DefaultTokenServices#createAccessToken(org.springframework.security.oauth2.provider.OAuth2Authentication)
-	 */
-	@Override
-	@Transactional
-	public OAuth2AccessToken createAccessToken(OAuth2Authentication authentication) throws AuthenticationException {
-
-		// Only create a new refresh token if there wasn't an existing one
-		// associated with an expired access token.
-		// Clients might be holding existing refresh tokens, so we re-use it in
-		// the case that the old access token
-		// expired.
-		OAuth2RefreshToken refreshToken = createRefreshToken(authentication);
-		OAuth2AccessToken accessToken = createDifferentAccessToken(authentication, refreshToken);
-		tokenStore.storeAccessToken(accessToken, authentication);
-		// In case it was modified
-		refreshToken = accessToken.getRefreshToken();
-		if (refreshToken != null) {
-			tokenStore.storeRefreshToken(refreshToken, authentication);
+		OAuth2Request authorizationRequest = authentication.getOAuth2Request();
+		values.put(CLIENT_ID, authorizationRequest.getClientId());
+		if (authorizationRequest.getScope() != null) {
+			values.put(SCOPE, OAuth2Utils.formatParameterList(authorizationRequest.getScope()));
 		}
 
-		return accessToken;
+		values.put(TIME, String.valueOf(System.currentTimeMillis()));
+
+		MessageDigest digest;
+		try {
+			digest = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException("MD5 algorithm not available.  Fatal (should be in the JDK).");
+		}
+
+		try {
+			byte[] bytes = digest.digest(values.toString().getBytes("UTF-8"));
+			return String.format("%032x", new BigInteger(1, bytes));
+		} catch (UnsupportedEncodingException e) {
+			throw new IllegalStateException("UTF-8 encoding not available.  Fatal (should be in the JDK).");
+		}
 	}
-	
-	public void setTokenStore(TokenStore tokenStore) {
-		this.tokenStore = tokenStore;
-		super.setTokenStore(tokenStore);
-	}
+
 }

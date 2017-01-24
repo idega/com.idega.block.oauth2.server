@@ -37,12 +37,20 @@
 	</bean> 
 	-->
 
+	<bean
+		id="keyGenerator"
+		class="com.idega.block.oauth2.server.configuration.IdegaAuthenticationKeyGenerator" >
+	</bean>
+
 	<!-- This defined token store, we have used inmemory tokenstore for now 
 		but this can be changed to a user defined one -->
 	<bean
 		id="tokenStore"
 		class="com.idega.block.oauth2.server.configuration.IdegaJDBCTokenStore" >
 		<constructor-arg ref="oauthDataSource" />
+		<property
+			name="authenticationKeyGenerator"
+			ref="keyGenerator" />
 	</bean>
 
 	<!--
@@ -60,7 +68,7 @@
 	-->
 	<bean
 		id="clientDetailsUserService"
-		class="org.springframework.security.oauth2.provider.client.ClientDetailsUserDetailsService">
+		class="com.idega.block.oauth2.server.configuration.IdegaUserDetailsService">
 		<constructor-arg ref="clientDetails" />
 	</bean>
 	<security:authentication-manager
@@ -121,7 +129,7 @@
 	-->
 
 	<bean 
-		id="tokenEnhancer"
+		id="idegaTokenEnhancer"
 		class="com.idega.block.oauth2.server.configuration.IdegaTokenEnhancer">
 	</bean>
 
@@ -147,7 +155,7 @@
 			ref="clientDetails" />
 		<property
 			name="tokenEnhancer"
-			ref="tokenEnhancer"/>
+			ref="idegaTokenEnhancer"/>
 	</bean>
 
 	<!--

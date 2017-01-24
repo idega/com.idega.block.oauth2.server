@@ -1,5 +1,5 @@
 /**
- * @(#)idegaDefaultTokenServices.java    1.0.0 13:39:58
+ * @(#)Member.java    1.0.0 12:55:14
  *
  * Idega Software hf. Source Code Licence Agreement x
  *
@@ -80,99 +80,75 @@
  *     License that was purchased to become eligible to receive the Source 
  *     Code after Licensee receives the source code. 
  */
-package com.idega.block.oauth2.server.configuration;
+package com.idega.block.oauth2.server.data;
 
-import java.util.Date;
-import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Collection;
 
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.oauth2.common.DefaultExpiringOAuth2RefreshToken;
-import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
-import org.springframework.security.oauth2.common.DefaultOAuth2RefreshToken;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.common.OAuth2RefreshToken;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
-import org.springframework.security.oauth2.provider.token.TokenStore;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import com.idega.util.Encrypter;
 
 /**
+ * <p>Data bean for passing required users to oauth service</p>
  * <p>You can report about problems to: 
  * <a href="mailto:martynas@idega.is">Martynas Stakė</a></p>
  *
- * @version 1.0.0 2017-01-10
+ * @version 1.0.0 2017-01-19
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
-public class IdegaDefaultTokenServices extends DefaultTokenServices {
+public class Member implements UserDetails {
 
-	private TokenStore tokenStore = null;
+	private static final long serialVersionUID = -1245286730091893349L;
 
-	private OAuth2RefreshToken createRefreshToken(OAuth2Authentication authentication) {
-		if (!isSupportRefreshToken(authentication.getOAuth2Request())) {
-			return null;
-		}
-		int validitySeconds = getRefreshTokenValiditySeconds(authentication.getOAuth2Request());
-		String value = UUID.randomUUID().toString();
-		if (validitySeconds > 0) {
-			return new DefaultExpiringOAuth2RefreshToken(value, new Date(System.currentTimeMillis()
-					+ (validitySeconds * 1000L)));
-		}
-		return new DefaultOAuth2RefreshToken(value);
+	private String username;
+
+	private String password;
+
+	private boolean isEnabled = false;
+
+	public Member(String username, String password, boolean isEnabled) {
+		this.username = username;
+		this.password = Encrypter.encryptOneWay(password);
+		this.isEnabled = isEnabled;
 	}
 
-	private OAuth2AccessToken createAccessToken(OAuth2Authentication authentication, OAuth2RefreshToken refreshToken) {
-		DefaultOAuth2AccessToken token = new DefaultOAuth2AccessToken(UUID.randomUUID().toString());
-		int validitySeconds = getAccessTokenValiditySeconds(authentication.getOAuth2Request());
-		if (validitySeconds > 0) {
-			token.setExpiration(new Date(System.currentTimeMillis() + (validitySeconds * 1000L)));
-		}
-		token.setRefreshToken(refreshToken);
-		token.setScope(authentication.getOAuth2Request().getScope());
-
-		return token;
-	}
-
-	@Transactional
-	public OAuth2AccessToken createDifferentAccessToken(OAuth2Authentication authentication, OAuth2RefreshToken refreshToken) throws AuthenticationException {
-		OAuth2AccessToken existingAccessToken = tokenStore.getAccessToken(authentication);
-		
-		OAuth2AccessToken accessToken = null;
-		if (authentication != null && refreshToken != null) {
-			do {
-				accessToken = createAccessToken(authentication, refreshToken);
-			} while(existingAccessToken != null && accessToken.getValue().equals(existingAccessToken.getValue()));
-		}
-
-		return accessToken;
-	}
-
-	/*
-	 * (non-Javadoc)
-	 * @see org.springframework.security.oauth2.provider.token.DefaultTokenServices#createAccessToken(org.springframework.security.oauth2.provider.OAuth2Authentication)
-	 */
 	@Override
-	@Transactional
-	public OAuth2AccessToken createAccessToken(OAuth2Authentication authentication) throws AuthenticationException {
-
-		// Only create a new refresh token if there wasn't an existing one
-		// associated with an expired access token.
-		// Clients might be holding existing refresh tokens, so we re-use it in
-		// the case that the old access token
-		// expired.
-		OAuth2RefreshToken refreshToken = createRefreshToken(authentication);
-		OAuth2AccessToken accessToken = createDifferentAccessToken(authentication, refreshToken);
-		tokenStore.storeAccessToken(accessToken, authentication);
-		// In case it was modified
-		refreshToken = accessToken.getRefreshToken();
-		if (refreshToken != null) {
-			tokenStore.storeRefreshToken(refreshToken, authentication);
-		}
-
-		return accessToken;
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+		ArrayList<SimpleGrantedAuthority> list = new ArrayList<>();
+		list.add(new SimpleGrantedAuthority("ROLE_APP"));
+		return list;
 	}
-	
-	public void setTokenStore(TokenStore tokenStore) {
-		this.tokenStore = tokenStore;
-		super.setTokenStore(tokenStore);
+
+	@Override
+	public String getPassword() {
+		return password;
+	}
+
+	@Override
+	public String getUsername() {
+		return username;
+	}
+
+	@Override
+	public boolean isAccountNonExpired() {
+		return isEnabled;
+	}
+
+	@Override
+	public boolean isAccountNonLocked() {
+		return isEnabled;
+	}
+
+	@Override
+	public boolean isCredentialsNonExpired() {
+		return isEnabled;
+	}
+
+	@Override
+	public boolean isEnabled() {
+		return isEnabled;
 	}
 }

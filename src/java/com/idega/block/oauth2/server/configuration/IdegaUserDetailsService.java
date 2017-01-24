@@ -1,5 +1,5 @@
 /**
- * @(#)idegaDefaultTokenServices.java    1.0.0 13:39:58
+ * @(#)IdegaUserDetailsServiceConfigurer.java    1.0.0 12:40:11
  *
  * Idega Software hf. Source Code Licence Agreement x
  *
@@ -82,97 +82,54 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
-import java.util.Date;
-import java.util.UUID;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.oauth2.provider.ClientDetailsService;
+import org.springframework.security.oauth2.provider.client.ClientDetailsUserDetailsService;
 
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.oauth2.common.DefaultExpiringOAuth2RefreshToken;
-import org.springframework.security.oauth2.common.DefaultOAuth2AccessToken;
-import org.springframework.security.oauth2.common.DefaultOAuth2RefreshToken;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.common.OAuth2RefreshToken;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.token.DefaultTokenServices;
-import org.springframework.security.oauth2.provider.token.TokenStore;
-import org.springframework.transaction.annotation.Transactional;
+import com.idega.block.oauth2.server.data.Member;
+import com.idega.block.oauth2.server.data.dao.MemberDAO;
+import com.idega.util.expression.ELUtil;
 
 /**
+ * <p>Adding possibility to load user data from custom tables</p>
  * <p>You can report about problems to: 
  * <a href="mailto:martynas@idega.is">Martynas Stakė</a></p>
  *
- * @version 1.0.0 2017-01-10
+ * @version 1.0.0 2017-01-19
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
-public class IdegaDefaultTokenServices extends DefaultTokenServices {
+public class IdegaUserDetailsService extends ClientDetailsUserDetailsService {
 
-	private TokenStore tokenStore = null;
+	private MemberDAO memberDAO = null;
 
-	private OAuth2RefreshToken createRefreshToken(OAuth2Authentication authentication) {
-		if (!isSupportRefreshToken(authentication.getOAuth2Request())) {
-			return null;
-		}
-		int validitySeconds = getRefreshTokenValiditySeconds(authentication.getOAuth2Request());
-		String value = UUID.randomUUID().toString();
-		if (validitySeconds > 0) {
-			return new DefaultExpiringOAuth2RefreshToken(value, new Date(System.currentTimeMillis()
-					+ (validitySeconds * 1000L)));
-		}
-		return new DefaultOAuth2RefreshToken(value);
-	}
-
-	private OAuth2AccessToken createAccessToken(OAuth2Authentication authentication, OAuth2RefreshToken refreshToken) {
-		DefaultOAuth2AccessToken token = new DefaultOAuth2AccessToken(UUID.randomUUID().toString());
-		int validitySeconds = getAccessTokenValiditySeconds(authentication.getOAuth2Request());
-		if (validitySeconds > 0) {
-			token.setExpiration(new Date(System.currentTimeMillis() + (validitySeconds * 1000L)));
-		}
-		token.setRefreshToken(refreshToken);
-		token.setScope(authentication.getOAuth2Request().getScope());
-
-		return token;
-	}
-
-	@Transactional
-	public OAuth2AccessToken createDifferentAccessToken(OAuth2Authentication authentication, OAuth2RefreshToken refreshToken) throws AuthenticationException {
-		OAuth2AccessToken existingAccessToken = tokenStore.getAccessToken(authentication);
-		
-		OAuth2AccessToken accessToken = null;
-		if (authentication != null && refreshToken != null) {
-			do {
-				accessToken = createAccessToken(authentication, refreshToken);
-			} while(existingAccessToken != null && accessToken.getValue().equals(existingAccessToken.getValue()));
+	private MemberDAO getMemberDAO() {
+		if (this.memberDAO == null) {
+			try {
+				this.memberDAO = ELUtil.getInstance().getBean(MemberDAO.BEAN_NAME);
+			} catch (Exception e) {}
 		}
 
-		return accessToken;
+		return this.memberDAO;
+	}	
+
+	public IdegaUserDetailsService(ClientDetailsService clientDetailsService) {
+		super(clientDetailsService);
 	}
 
 	/*
 	 * (non-Javadoc)
-	 * @see org.springframework.security.oauth2.provider.token.DefaultTokenServices#createAccessToken(org.springframework.security.oauth2.provider.OAuth2Authentication)
+	 * @see org.springframework.security.oauth2.provider.client.ClientDetailsUserDetailsService#loadUserByUsername(java.lang.String)
 	 */
 	@Override
-	@Transactional
-	public OAuth2AccessToken createAccessToken(OAuth2Authentication authentication) throws AuthenticationException {
-
-		// Only create a new refresh token if there wasn't an existing one
-		// associated with an expired access token.
-		// Clients might be holding existing refresh tokens, so we re-use it in
-		// the case that the old access token
-		// expired.
-		OAuth2RefreshToken refreshToken = createRefreshToken(authentication);
-		OAuth2AccessToken accessToken = createDifferentAccessToken(authentication, refreshToken);
-		tokenStore.storeAccessToken(accessToken, authentication);
-		// In case it was modified
-		refreshToken = accessToken.getRefreshToken();
-		if (refreshToken != null) {
-			tokenStore.storeRefreshToken(refreshToken, authentication);
+	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		if (getMemberDAO() != null) {
+			Member member = getMemberDAO().getMember(username);
+			if (member != null) {
+				return member;
+			}
 		}
 
-		return accessToken;
-	}
-	
-	public void setTokenStore(TokenStore tokenStore) {
-		this.tokenStore = tokenStore;
-		super.setTokenStore(tokenStore);
+		return super.loadUserByUsername(username);
 	}
 }
