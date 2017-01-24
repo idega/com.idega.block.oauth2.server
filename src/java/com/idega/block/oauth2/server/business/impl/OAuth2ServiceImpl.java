@@ -88,8 +88,10 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 
 import javax.ejb.FinderException;
@@ -111,12 +113,19 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.common.util.OAuth2Utils;
+import org.springframework.security.oauth2.provider.AuthorizationRequest;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.security.oauth2.provider.OAuth2Request;
+import org.springframework.security.oauth2.provider.OAuth2RequestFactory;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.stereotype.Service;
 
 import com.idega.block.login.bean.OAuthToken;
 import com.idega.block.login.business.OAuth2Service;
+import com.idega.block.oauth2.server.OAuth2AccessTokenBean;
+import com.idega.block.oauth2.server.configuration.IdegaDefaultTokenServices;
+import com.idega.block.oauth2.server.configuration.InternalAuthenticationProvider;
 import com.idega.core.accesscontrol.business.LoginBusinessBean;
 import com.idega.core.accesscontrol.data.LoginTable;
 import com.idega.core.accesscontrol.data.LoginTableHome;
@@ -124,6 +133,7 @@ import com.idega.core.accesscontrol.event.LoggedInUserCredentials;
 import com.idega.core.business.DefaultSpringBean;
 import com.idega.data.IDOLookup;
 import com.idega.data.IDOLookupException;
+import com.idega.idegaweb.IWMainApplicationSettings;
 import com.idega.presentation.IWContext;
 import com.idega.servlet.filter.RequestResponseProvider;
 import com.idega.user.dao.UserDAO;
@@ -153,8 +163,7 @@ import com.sun.jersey.client.urlconnection.HTTPSProperties;
  */
 @Service("oauth2Service")
 @Scope(BeanDefinition.SCOPE_SINGLETON)
-public class OAuth2ServiceImpl extends DefaultSpringBean
-		implements OAuth2Service, ApplicationListener<LoggedInUserCredentials> {
+public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Service, ApplicationListener<LoggedInUserCredentials> {
 
 	private LoginTableHome loginTableHome;
 
@@ -165,6 +174,9 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 
 	@Autowired(required = false)
 	private TokenStore tokenStore;
+
+	@Autowired(required = false)
+	private IdegaDefaultTokenServices tokenServices;
 
 	private LoginBusinessBean getLoginBusinessBean() {
 		if (this.loginBusinessBean == null) {
@@ -365,8 +377,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 	}
 
 	@Override
-	public OAuthToken getToken(String serverURL, String clientId, String clientSecret, String username,
-			String password) {
+	public OAuthToken getToken(String serverURL, String clientId, String clientSecret, String username, String password) {
 		if (StringUtil.isEmpty(serverURL)) {
 			return null;
 		}
@@ -408,14 +419,12 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 			WebResource.Builder builder = webResource.accept(MediaType.APPLICATION_JSON);
 			token = builder.post(OAuthToken.class);
 		} catch (Exception e) {
-			getLogger().log(Level.WARNING,
-					"Error logging in user with username: " + username + ". Web resource: " + webResource, e);
+			getLogger().log(Level.WARNING, "Error logging in user with username: " + username + ". Web resource: " + webResource, e);
 			return null;
 		}
 
 		if (token == null || StringUtil.isEmpty(token.getAccess_token())) {
-			getLogger().warning(
-					"Error getting authentication token for username " + username + ". Web resource: " + webResource);
+			getLogger().warning("Error getting authentication token for username " + username + ". Web resource: " + webResource);
 			return null;
 		}
 
@@ -423,8 +432,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 	}
 
 	private boolean isAllowedToAcceptAllCertificates(String url) {
-		return !StringUtil.isEmpty(url) && url.startsWith("https")
-				&& getSettings().getBoolean("oauth.accept_all_cert", Boolean.FALSE);
+		return !StringUtil.isEmpty(url) && url.startsWith("https") && getSettings().getBoolean("oauth.accept_all_cert", Boolean.FALSE);
 	}
 
 	private Client getClient(String url) {
@@ -475,20 +483,85 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 			return;
 		}
 
-		if (!getSettings().getBoolean("oauth_auto_create_token", Boolean.FALSE)) {
+		IWMainApplicationSettings settings = getSettings();
+		if (!settings.getBoolean("oauth_auto_create_token", Boolean.FALSE)) {
 			return;
 		}
 
-		String username = credentials.getUserName();
-		OAuthToken token = getToken(credentials.getServerURL(), null, null, username, credentials.getPassword());
-		if (token != null) {
-			getCache().put(username, token);
+		switch (credentials.getType()) {
+		case AUTHENTICATION_GATEWAY:
+			createAccessToken(credentials, settings.getProperty("oauth_default_client_id"));
+
+			break;
+
+		default:
+			String username = credentials.getUserName();
+			OAuthToken token = getToken(credentials.getServerURL(), null, null, username, credentials.getPassword());
+			if (token != null) {
+				getCache().put(username, token);
+			}
+
+			break;
 		}
 	}
 
+	@Autowired(required = false)
+	private InternalAuthenticationProvider authenticationProvider;
+
+	@Autowired(required = false)
+	private OAuth2RequestFactory oAuth2RequestFactory;
+
+	private OAuth2AccessToken createAccessToken(LoggedInUserCredentials credentials, String clientId) {
+		if (credentials == null || credentials.getLoginId() == null) {
+			return null;
+		}
+
+		try {
+			LoginTableHome loginTableHome = (LoginTableHome) IDOLookup.getHome(LoginTable.class);
+			LoginTable login = loginTableHome.findByPrimaryKey(credentials.getLoginId());
+			Authentication authResult = authenticationProvider.getAuthentication(login, credentials.getUserName());
+
+			HttpServletRequest request = credentials.getRequest();
+			Map<String, String> map = getSingleValueMap(request);
+			map.put(OAuth2Utils.CLIENT_ID, clientId);
+			AuthorizationRequest authorizationRequest = oAuth2RequestFactory.createAuthorizationRequest(map);
+
+			authorizationRequest.setScope(getScope(request));
+			if (authResult.isAuthenticated()) {
+				// Ensure the OAuth2Authentication is authenticated
+				authorizationRequest.setApproved(true);
+			}
+
+			OAuth2Request storedOAuth2Request = oAuth2RequestFactory.createOAuth2Request(authorizationRequest);
+
+			OAuth2Authentication authentication = new OAuth2Authentication(storedOAuth2Request, authResult);
+			OAuth2AccessToken accessToken = tokenServices.createAccessToken(authentication);
+			if (accessToken != null) {
+				getCache().put(login.getUserLogin(), new OAuth2AccessTokenBean(accessToken, authorizationRequest));
+			}
+			return accessToken;
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error creating access token for " + credentials, e);
+		}
+
+		return null;
+	}
+
+	private Map<String, String> getSingleValueMap(HttpServletRequest request) {
+		Map<String, String> map = new HashMap<String, String>();
+		Map<String, String[]> parameters = request.getParameterMap();
+		for (String key : parameters.keySet()) {
+			String[] values = parameters.get(key);
+			map.put(key, values != null && values.length > 0 ? values[0] : null);
+		}
+		return map;
+	}
+	private Set<String> getScope(HttpServletRequest request) {
+		return OAuth2Utils.parseParameterList(request.getParameter("scope"));
+	}
+
 	private Map<String, OAuthToken> getCache() {
-		Map<String, OAuthToken> cache = getCache("oauth2AccessTokensForUserNames", 604800, 604800, Integer.MAX_VALUE,
-				false);
+		Map<String, OAuthToken> cache = getCache("oauth2AccessTokensForUserNames", 604800, 604800, Integer.MAX_VALUE, false);
 		return cache;
 	}
 
@@ -500,4 +573,5 @@ public class OAuth2ServiceImpl extends DefaultSpringBean
 
 		return getCache().get(username);
 	}
+
 }
