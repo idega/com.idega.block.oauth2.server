@@ -48,8 +48,8 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		String token = null;
 		Object request = authentication.getDetails();
 		if (request instanceof Map) {
-			Map<String, String> details = (Map) request;
-			token = details.get("token");
+			Map<?, ?> details = (Map<?, ?>) request;
+			token = (String) details.get("token");
 		}
 		if (token == null) {
 			return null;
