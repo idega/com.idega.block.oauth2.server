@@ -94,7 +94,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 
-import javax.ejb.FinderException;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -132,11 +131,8 @@ import com.idega.core.accesscontrol.data.LoginTableHome;
 import com.idega.core.accesscontrol.event.LoggedInUserCredentials;
 import com.idega.core.business.DefaultSpringBean;
 import com.idega.data.IDOLookup;
-import com.idega.data.IDOLookupException;
 import com.idega.idegaweb.IWMainApplicationSettings;
 import com.idega.presentation.IWContext;
-import com.idega.servlet.filter.RequestResponseProvider;
-import com.idega.user.dao.UserDAO;
 import com.idega.util.CoreConstants;
 import com.idega.util.CoreUtil;
 import com.idega.util.ListUtil;
@@ -165,11 +161,6 @@ import com.sun.jersey.client.urlconnection.HTTPSProperties;
 @Scope(BeanDefinition.SCOPE_SINGLETON)
 public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Service, ApplicationListener<LoggedInUserCredentials> {
 
-	private LoginTableHome loginTableHome;
-
-	@Autowired
-	private UserDAO userDAO;
-
 	private LoginBusinessBean loginBusinessBean;
 
 	@Autowired(required = false)
@@ -194,26 +185,6 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		return this.tokenStore;
 	}
 
-	private UserDAO getUserDAO() {
-		if (this.userDAO == null) {
-			ELUtil.getInstance().autowire(this);
-		}
-
-		return this.userDAO;
-	}
-
-	private LoginTableHome getLoginTableHome() {
-		if (loginTableHome == null) {
-			try {
-				loginTableHome = (LoginTableHome) IDOLookup.getHome(LoginTable.class);
-			} catch (IDOLookupException e) {
-				getLogger().log(Level.WARNING, "Failed to get " + LoginTableHome.class.getName(), e);
-			}
-		}
-
-		return loginTableHome;
-	}
-
 	/*
 	 * (non-Javadoc)
 	 *
@@ -221,147 +192,78 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	 */
 	@Override
 	public com.idega.user.data.bean.User getAuthenticatedUser() {
-		SecurityContext securityContext = SecurityContextHolder.getContext();
-		if (securityContext == null) {
-			throw new IllegalStateException("Failed to get " + SecurityContext.class);
+		if (authenticationProvider == null) {
+			getLogger().warning("Bean with type " + InternalAuthenticationProvider.class.getName() + " is not available");
+			return null;
 		}
 
-		Authentication authentication = securityContext.getAuthentication();
+		return authenticationProvider.getAuthenticatedUser();
+	}
+
+	@Override
+	public boolean logoutUser() {
+		SecurityContext securityContext = SecurityContextHolder.getContext();
+		if (securityContext == null) {
+			return true;	//	User is not logged in
+		}
+
+		OAuth2Authentication authentication = (OAuth2Authentication) securityContext.getAuthentication();
 		if (authentication == null) {
-			throw new IllegalStateException("Failed to get authentication info from security context");
+			return true;
 		}
 
 		Object rawPrincipal = authentication.getPrincipal();
 		if (rawPrincipal == null) {
-			throw new IllegalStateException("Failed to get user from security context");
+			return true;
 		}
 
 		String login = null;
 		if (rawPrincipal instanceof User) {
 			User principal = (User) authentication.getPrincipal();
 			if (principal == null) {
-				throw new IllegalStateException("Failed to get user from security context");
+				return true;
 			}
 			login = principal.getUsername();
 		} else if (rawPrincipal instanceof String) {
 			login = (String) rawPrincipal;
 		} else {
-			throw new IllegalStateException("Failed to get user from security context");
+			return true;
 		}
-
-		LoginTable loginTable = null;
-		try {
-			loginTable = getLoginTableHome().findByLogin(login);
-		} catch (FinderException e) {
-			throw new IllegalStateException("User by login name " + login + " was not found");
-		}
-
-		com.idega.user.data.bean.User user = getUserDAO().getUser(loginTable.getUserId());
 
 		IWContext iwc = CoreUtil.getIWContext();
-		if (iwc == null) {
-			RequestResponseProvider requestProvider = null;
-			try {
-				requestProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
-				HttpServletRequest request = requestProvider.getRequest();
-				iwc = new IWContext(request, requestProvider.getResponse(), request.getServletContext());
-			} catch (Exception e) {
-				throw new IllegalStateException("Failed to create context for user " + login);
+
+		String tokenValue = authentication.getOAuth2Request().getRequestParameters().get("access_token");
+		if (StringUtil.isEmpty(tokenValue) && iwc != null) {
+			tokenValue = iwc.getParameter("access_token");
+
+			if (StringUtil.isEmpty(tokenValue)) {
+				String authorization = iwc.getAuthorizationHeader();
+				tokenValue = StringUtil.isEmpty(authorization) ? tokenValue : StringHandler.replace(authorization, "Bearer ", CoreConstants.EMPTY);
 			}
 		}
 
-		try {
-			if (iwc.isLoggedOn()) {
-				com.idega.user.data.bean.User loggedInUser = iwc.getLoggedInUser();
-				if (loggedInUser != null && loggedInUser.getId().intValue() == user.getId().intValue()) {
-					return user;
-				}
-
-				if (LoginBusinessBean.getLoginBusinessBean(iwc.getRequest()).logInAsAnotherUser(iwc, user)) {
-					return user;
-				}
-			} else {
-				HttpServletRequest request = iwc.getRequest();
-				if (LoginBusinessBean.getLoginBusinessBean(request).logInUser(request, user)) {
-					return user;
-				}
-			}
-		} catch (Exception e) {
-			throw new IllegalStateException("Unable to login in user " + user);
-		}
-
-		return null;
-	}
-
-	@Override
-	public boolean logoutUser() {
-		com.idega.user.data.bean.User user = getAuthenticatedUser();
-		if (user != null) {
-			SecurityContext securityContext = SecurityContextHolder.getContext();
-			if (securityContext == null) {
-				throw new IllegalStateException("User is not logged in!");
-			}
-
-			OAuth2Authentication authentication = (OAuth2Authentication) securityContext.getAuthentication();
-			if (authentication == null) {
-				throw new IllegalStateException("Failed to get authentication info from security context");
-			}
-
-			Object rawPrincipal = authentication.getPrincipal();
-			if (rawPrincipal == null) {
-				throw new IllegalStateException("Failed to get user from security context");
-			}
-
-			String login = null;
-			if (rawPrincipal instanceof User) {
-				User principal = (User) authentication.getPrincipal();
-				if (principal == null) {
-					throw new IllegalStateException("Failed to get user from security context");
-				}
-				login = principal.getUsername();
-			} else if (rawPrincipal instanceof String) {
-				login = (String) rawPrincipal;
-			} else {
-				throw new IllegalStateException("Failed to get user from security context");
-			}
-
-			IWContext iwc = CoreUtil.getIWContext();
-
-			String tokenValue = authentication.getOAuth2Request().getRequestParameters().get("access_token");
-			if (StringUtil.isEmpty(tokenValue) && iwc != null) {
-				tokenValue = iwc.getParameter("access_token");
-
+		Collection<OAuth2AccessToken> tokens = getTokenStore().findTokensByClientIdAndUserName(
+				authentication.getOAuth2Request().getClientId(),
+				login
+		);
+		if (!ListUtil.isEmpty(tokens)) {
+			List<OAuth2AccessToken> tokensToRemove = new ArrayList<>();
+			for (OAuth2AccessToken token: tokens) {
 				if (StringUtil.isEmpty(tokenValue)) {
-					String authorization = iwc.getAuthorizationHeader();
-					tokenValue = StringUtil.isEmpty(authorization) ? tokenValue : StringHandler.replace(authorization, "Bearer ", CoreConstants.EMPTY);
+					tokensToRemove.add(token);
+				} else if (tokenValue.equals(token.getValue())) {
+					tokensToRemove.add(token);
+					break;
 				}
 			}
 
-			Collection<OAuth2AccessToken> tokens = getTokenStore().findTokensByClientIdAndUserName(
-					authentication.getOAuth2Request().getClientId(),
-					login
-			);
-			if (!ListUtil.isEmpty(tokens)) {
-				List<OAuth2AccessToken> tokensToRemove = new ArrayList<>();
-				for (OAuth2AccessToken token: tokens) {
-					if (StringUtil.isEmpty(tokenValue)) {
-						tokensToRemove.add(token);
-					} else if (tokenValue.equals(token.getValue())) {
-						tokensToRemove.add(token);
-						break;
-					}
-				}
-
-				getLogger().info("Tokens to remove: " + tokensToRemove + ", username: " + login + ", provided token: " + tokenValue);
-				for (OAuth2AccessToken token: tokensToRemove) {
-					getTokenStore().removeAccessToken(token);
-				}
+			getLogger().info("Tokens to remove: " + tokensToRemove + ", username: " + login + ", provided token: " + tokenValue);
+			for (OAuth2AccessToken token: tokensToRemove) {
+				getTokenStore().removeAccessToken(token);
 			}
-
-			return getLoginBusinessBean().logOutUser(iwc);
 		}
 
-		return true;
+		return getLoginBusinessBean().logOutUser(iwc);
 	}
 
 	private String getURL(String serverURL) {
@@ -389,17 +291,17 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		}
 
 		if (StringUtil.isEmpty(clientId)) {
-			clientId = getApplicationProperty("oauth_default_client_id");
+			clientId = getDefaultClientId();
 		}
 		if (StringUtil.isEmpty(clientId)) {
-			getLogger().warning("Client ID is unknown");
+			getLogger().warning("Client's ID is not provided and unknown from app's properties - can not create token for username " + username);
 			return null;
 		}
 		if (StringUtil.isEmpty(clientSecret)) {
-			clientSecret = getApplicationProperty("oauth_default_client_secret");
+			clientSecret = getDefaultSecret();
 		}
 		if (StringUtil.isEmpty(clientSecret)) {
-			getLogger().warning("Client secret is unknown");
+			getLogger().warning("Client's secret is not provided and unknown from app's properties - can not create token for username " + username);
 			return null;
 		}
 
@@ -412,7 +314,9 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 			String url = getURL(serverURL);
 			Client client = getClient(url);
 			webResource = client.resource(url);
-			webResource = webResource.queryParam("grant_type", "password").queryParam("client_id", clientId)
+			webResource = webResource
+					.queryParam("grant_type", "password")
+					.queryParam("client_id", clientId)
 					.queryParam("client_secret", clientSecret)
 					.queryParam("username", URLEncoder.encode(username, CoreConstants.ENCODING_UTF8))
 					.queryParam("password", URLEncoder.encode(password, CoreConstants.ENCODING_UTF8));
@@ -490,19 +394,40 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 		switch (credentials.getType()) {
 		case AUTHENTICATION_GATEWAY:
-			createAccessToken(credentials, settings.getProperty("oauth_default_client_id"));
+			createAccessToken(credentials, getDefaultClientId());
 
 			break;
 
 		default:
 			String username = credentials.getUserName();
-			OAuthToken token = getToken(credentials.getServerURL(), null, null, username, credentials.getPassword());
+			if (!StringUtil.isEmpty(username) && getCache().get(username) != null) {
+				return;	//	Token already exists
+			}
+
+			String clientId = getDefaultClientId();
+			if (StringUtil.isEmpty(clientId)) {
+				return;
+			}
+			String secret = getDefaultSecret();
+			if (StringUtil.isEmpty(secret)) {
+				return;
+			}
+
+			OAuthToken token = getToken(credentials.getServerURL(), clientId, secret, username, credentials.getPassword());
 			if (token != null) {
 				getCache().put(username, token);
 			}
 
 			break;
 		}
+	}
+
+	private String getDefaultClientId() {
+		return getApplicationProperty("oauth_default_client_id");
+	}
+
+	private String getDefaultSecret() {
+		return getApplicationProperty("oauth_default_client_secret");
 	}
 
 	@Autowired(required = false)
@@ -585,7 +510,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 			return token;
 		}
 
-		createAccessToken(credentials, getApplicationProperty("oauth_default_client_id"));
+		createAccessToken(credentials, getDefaultClientId());
 
 		return getToken(credentials.getUserName());
 	}
