@@ -138,6 +138,7 @@ import com.idega.util.CoreUtil;
 import com.idega.util.ListUtil;
 import com.idega.util.StringHandler;
 import com.idega.util.StringUtil;
+import com.idega.util.datastructures.map.MapUtil;
 import com.idega.util.expression.ELUtil;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.WebResource;
@@ -415,14 +416,20 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 			OAuthToken token = getToken(credentials.getServerURL(), clientId, secret, username, credentials.getPassword());
 			if (token != null) {
-				getCache().put(username, token);
+				Map<String, OAuthToken> tokens = getCache().get(clientId);
+				if (tokens == null) {
+					tokens = new HashMap<>();
+					getCache().put(clientId, tokens);
+				}
+				tokens.put(username, token);
 			}
 
 			break;
 		}
 	}
 
-	private String getDefaultClientId() {
+	@Override
+	public String getDefaultClientId() {
 		return getApplicationProperty("oauth_default_client_id");
 	}
 
@@ -436,7 +443,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	@Autowired(required = false)
 	private OAuth2RequestFactory oAuth2RequestFactory;
 
-	private OAuth2AccessToken createAccessToken(LoggedInUserCredentials credentials, String clientId) {
+	private OAuthToken createAccessToken(LoggedInUserCredentials credentials, String clientId) {
 		if (credentials == null || credentials.getLoginId() == null) {
 			return null;
 		}
@@ -461,10 +468,18 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 			OAuth2Authentication authentication = new OAuth2Authentication(storedOAuth2Request, authResult);
 			OAuth2AccessToken accessToken = tokenServices.createAccessToken(authentication);
-			if (accessToken != null) {
-				getCache().put(login.getUserLogin(), new OAuth2AccessTokenBean(accessToken, authorizationRequest));
+			if (accessToken == null) {
+				return null;
 			}
-			return accessToken;
+
+			Map<String, OAuthToken> tokens = getCache().get(clientId);
+			if (tokens == null) {
+				tokens = new HashMap<>();
+				getCache().put(clientId, tokens);
+			}
+			OAuthToken token = new OAuth2AccessTokenBean(accessToken, authorizationRequest);
+			tokens.put(login.getUserLogin(), token);
+			return token;
 		} catch (Exception e) {
 			getLogger().log(Level.WARNING, "Error creating access token for " + credentials, e);
 		}
@@ -485,33 +500,32 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		return OAuth2Utils.parseParameterList(request.getParameter("scope"));
 	}
 
-	private Map<String, OAuthToken> getCache() {
-		Map<String, OAuthToken> cache = getCache("oauth2AccessTokensForUserNames", 604800, 604800, Integer.MAX_VALUE, false);
+	private Map<String, Map<String, OAuthToken>> getCache() {
+		Map<String, Map<String, OAuthToken>> cache = getCache("oauth2AccessTokensForUserNamesAndClientId", 604800, 604800, Integer.MAX_VALUE, false);
 		return cache;
 	}
 
 	@Override
-	public OAuthToken getToken(String username) {
-		if (StringUtil.isEmpty(username)) {
+	public OAuthToken getToken(String clientId, String username) {
+		if (StringUtil.isEmpty(clientId) || StringUtil.isEmpty(username)) {
 			return null;
 		}
 
-		return getCache().get(username);
+		Map<String, OAuthToken> tokensForUserNames = getCache().get(clientId);
+		if (MapUtil.isEmpty(tokensForUserNames)) {
+			return null;
+		}
+
+		return tokensForUserNames.get(username);
 	}
 
 	@Override
-	public OAuthToken getToken(LoggedInUserCredentials credentials) {
+	public OAuthToken getToken(String clientId, LoggedInUserCredentials credentials) {
 		if (credentials == null) {
 			return null;
 		}
 
-		OAuthToken token = getToken(credentials.getUserName());
-		if (token != null) {
-			return token;
-		}
-
-		createAccessToken(credentials, getDefaultClientId());
-
-		return getToken(credentials.getUserName());
+		return createAccessToken(credentials, clientId);
 	}
+
 }
