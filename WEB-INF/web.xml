@@ -32,6 +32,11 @@
 		</init-param>
 		<load-on-startup>1</load-on-startup>
 	</servlet>
+    
+	<servlet>
+		<servlet-name>Authentication Management Service</servlet-name>
+		<servlet-class>com.idega.block.oauth2.server.authentication.servlet.AuthenticatorServlet</servlet-class>
+	</servlet>
 
 	<servlet-mapping>
 		<servlet-name>Token Management Service</servlet-name>
@@ -42,6 +47,11 @@
 		<servlet-name>OAuth2</servlet-name>
 		<url-pattern>/authentication/*</url-pattern>
 	</servlet-mapping>
+    
+    <servlet-mapping>
+        <servlet-name>Authentication Management Service</servlet-name>
+        <url-pattern>/authenticate/*</url-pattern>
+    </servlet-mapping>
 
 	<listener>
 		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
