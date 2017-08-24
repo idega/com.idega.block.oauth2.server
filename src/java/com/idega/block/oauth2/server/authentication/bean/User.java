@@ -16,6 +16,8 @@ public class User implements Serializable {
 
 	private String name;
 
+	private Address address;
+
 	public String getName() {
 		return name;
 	}
@@ -30,6 +32,14 @@ public class User implements Serializable {
 
 	public void setAccessToken(AccessToken accessToken) {
 		this.accessToken = accessToken;
+	}
+
+	public Address getAddress() {
+		return address;
+	}
+
+	public void setAddress(Address address) {
+		this.address = address;
 	}
 
 }
