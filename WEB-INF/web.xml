@@ -33,10 +33,40 @@
 		<load-on-startup>1</load-on-startup>
 	</servlet>
     
+    <!-- Authentication WS -->
 	<servlet>
 		<servlet-name>Authentication Management Service</servlet-name>
 		<servlet-class>com.idega.block.oauth2.server.authentication.servlet.AuthenticatorServlet</servlet-class>
+		<init-param>
+			<param-name>com.sun.jersey.config.property.packages</param-name>
+			<param-value>com.idega.block.oauth2.server.authentication.business</param-value>
+		</init-param>
+		<init-param>
+			<param-name>com.sun.jersey.config.property.packages</param-name>
+			<param-value>com.idega.block.oauth2.server.authentication.bean</param-value>
+		</init-param>
+		<init-param>
+			<param-name>com.sun.jersey.api.json.POJOMappingFeature</param-name>
+			<param-value>true</param-value>
+		</init-param>
+		<load-on-startup>1</load-on-startup>
 	</servlet>
+	<filter>
+		<filter-name>Authentication Management Service Filter</filter-name>
+		<filter-class>com.idega.block.oauth2.server.authentication.servlet.AuthenticatorServlet</filter-class>
+		<init-param>
+	       <param-name>allowedOrigins</param-name>
+	       <param-value>*</param-value>
+	   	</init-param>
+	   	<init-param>
+	       <param-name>allowedMethods</param-name>
+	       <param-value>*</param-value>
+	   	</init-param>
+	   	<init-param>
+	       <param-name>allowedHeaders</param-name>
+	       <param-value>*</param-value>
+	   	</init-param>
+	</filter>
 
 	<servlet-mapping>
 		<servlet-name>Token Management Service</servlet-name>
@@ -52,6 +82,10 @@
         <servlet-name>Authentication Management Service</servlet-name>
         <url-pattern>/authenticate/*</url-pattern>
     </servlet-mapping>
+    <filter-mapping>
+        <filter-name>Authentication Management Service Filter</filter-name>
+        <url-pattern>/authenticate/*</url-pattern>
+    </filter-mapping>
 
 	<listener>
 		<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
