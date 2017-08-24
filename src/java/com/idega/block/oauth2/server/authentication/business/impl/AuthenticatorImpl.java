@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 import com.idega.block.login.bean.OAuthToken;
 import com.idega.block.login.business.OAuth2Service;
 import com.idega.block.oauth2.server.authentication.bean.AccessToken;
-import com.idega.block.oauth2.server.authentication.bean.Credentials;
+import com.idega.block.oauth2.server.authentication.bean.AuthorizationCredentials;
 import com.idega.block.oauth2.server.authentication.business.Authenticator;
 import com.idega.core.accesscontrol.business.LoggedOnInfo;
 import com.idega.core.accesscontrol.business.LoginBusinessBean;
@@ -51,7 +51,7 @@ public class AuthenticatorImpl extends DefaultRestfulService implements Authenti
 	@POST
 	@Path(Authenticator.USER)
 	public Response getUser(
-			Credentials credentials,
+			AuthorizationCredentials credentials,
 			@Context HttpServletRequest request
 	) {
 		if (credentials == null) {
