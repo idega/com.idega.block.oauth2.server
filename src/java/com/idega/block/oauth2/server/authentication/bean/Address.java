@@ -65,6 +65,12 @@ public class Address implements Serializable {
 		}
 	}
 
+	public Address(String streetAddress, String city, String postalCode, String country) {
+		this();
+
+		initialize(streetAddress, city, postalCode, country, null, null);
+	}
+
 	private void initialize(String streetAddress, String city, String postalCode, String country, Integer countryId, Integer postalCodeId) {
 		setStreetAddress(streetAddress);
 		setCity(city);
