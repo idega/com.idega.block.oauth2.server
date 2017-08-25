@@ -10,6 +10,6 @@ public interface Authenticator {
 	public static final String 	PATH = "/authenticate",
 								USER = "/user";
 
-	public Response getUser(AuthorizationCredentials credentials, HttpServletRequest request);
+	public Response getAuthenticatedUser(AuthorizationCredentials credentials, HttpServletRequest request);
 
 }

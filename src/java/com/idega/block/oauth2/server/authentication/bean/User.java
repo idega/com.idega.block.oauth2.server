@@ -1,37 +1,32 @@
 package com.idega.block.oauth2.server.authentication.bean;
 
-import java.io.Serializable;
-
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import com.idega.block.login.bean.LoggedInUser;
+
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
-public class User implements Serializable {
+public class User extends LoggedInUser {
 
 	private static final long serialVersionUID = 3109303153488234141L;
 
-	private AccessToken accessToken;
-
-	private String name;
-
 	private Address address;
 
-	public String getName() {
-		return name;
+	public User() {
+		super();
 	}
 
-	public void setName(String name) {
-		this.name = name;
-	}
+	public User(LoggedInUser loggedInUser) {
+		this();
 
-	public AccessToken getAccessToken() {
-		return accessToken;
-	}
-
-	public void setAccessToken(AccessToken accessToken) {
-		this.accessToken = accessToken;
+		if (loggedInUser != null) {
+			setName(loggedInUser.getName());
+			setPersonalID(loggedInUser.getPersonalID());
+			setLogin(loggedInUser.getLogin());
+			setToken(loggedInUser.getToken());
+		}
 	}
 
 	public Address getAddress() {

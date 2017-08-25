@@ -101,6 +101,7 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import javax.ws.rs.core.MediaType;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -120,14 +121,18 @@ import org.springframework.security.oauth2.provider.OAuth2RequestFactory;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.stereotype.Service;
 
+import com.idega.block.login.bean.LoggedInUser;
 import com.idega.block.login.bean.OAuthToken;
+import com.idega.block.login.bean.UserCredentials;
 import com.idega.block.login.business.OAuth2Service;
 import com.idega.block.oauth2.server.OAuth2AccessTokenBean;
 import com.idega.block.oauth2.server.configuration.IdegaDefaultTokenServices;
 import com.idega.block.oauth2.server.configuration.InternalAuthenticationProvider;
+import com.idega.core.accesscontrol.business.LoggedOnInfo;
 import com.idega.core.accesscontrol.business.LoginBusinessBean;
 import com.idega.core.accesscontrol.data.LoginTable;
 import com.idega.core.accesscontrol.data.LoginTableHome;
+import com.idega.core.accesscontrol.data.bean.UserLogin;
 import com.idega.core.accesscontrol.event.LoggedInUserCredentials;
 import com.idega.core.business.DefaultSpringBean;
 import com.idega.data.IDOLookup;
@@ -526,6 +531,72 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		}
 
 		return createAccessToken(credentials, clientId);
+	}
+
+	@Override
+	public LoggedInUser getAuthenticatedUser(HttpServletRequest request, UserCredentials credentials) {
+		if (credentials == null) {
+			getLogger().warning("Credentials not provided");
+			return null;
+		}
+
+		try {
+			HttpSession session = request.getSession(true);
+
+			LoginBusinessBean loginBusinessBean = LoginBusinessBean.getLoginBusinessBean(request);
+			if (loginBusinessBean.isLoggedOn(request)) {
+				IWContext iwc = CoreUtil.getIWContext();
+				loginBusinessBean.logOutUser(iwc);
+			}
+
+			if (!loginBusinessBean.logInUser(request, credentials.getUsername(), credentials.getPassword())) {
+				return null;
+			}
+
+			com.idega.user.data.bean.User user = loginBusinessBean.getCurrentUser(session);
+			if (user == null) {
+				return null;
+			}
+
+			LoggedOnInfo info = loginBusinessBean.getLoggedOnInfo(session, credentials.getUsername());
+			if (info == null) {
+				return null;
+			}
+			UserLogin login = info.getUserLogin();
+			if (login == null) {
+				return null;
+			}
+			Integer loginId = login.getId();
+			if (loginId == null) {
+				return null;
+			}
+
+			LoggedInUserCredentials loggedInUserCredentials = new LoggedInUserCredentials(
+					request,
+					credentials.getUrl(),
+					credentials.getUsername(),
+					credentials.getPassword(),
+					null,
+					loginId
+			);
+			OAuthToken token = getToken(credentials.getClientId(), loggedInUserCredentials);
+			if (token == null) {
+				String message = "Failed to get access token";
+				getLogger().warning(message);
+				return null;
+			}
+
+			LoggedInUser loggedInUser = new LoggedInUser();
+			loggedInUser.setName(user.getName());
+			loggedInUser.setPersonalID(user.getPersonalID());
+			loggedInUser.setLogin(login.getUserLogin());
+			loggedInUser.setToken(token);
+			return loggedInUser;
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error while logging in " + credentials.getUsername(), e);
+		}
+
+		return null;
 	}
 
 }
