@@ -16,6 +16,7 @@ import com.idega.block.login.bean.LoggedInUser;
 import com.idega.block.login.business.OAuth2Service;
 import com.idega.block.oauth2.server.authentication.bean.AuthorizationCredentials;
 import com.idega.block.oauth2.server.authentication.bean.User;
+import com.idega.block.oauth2.server.authentication.business.AdditionalDataDAO;
 import com.idega.block.oauth2.server.authentication.business.Authenticator;
 import com.idega.restful.business.DefaultRestfulService;
 import com.idega.util.expression.ELUtil;
@@ -24,7 +25,8 @@ import com.idega.util.expression.ELUtil;
 @Path(Authenticator.PATH)
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public class AuthenticatorImpl extends DefaultRestfulService implements Authenticator {
+public class AuthenticatorImpl extends DefaultRestfulService implements
+		Authenticator {
 
 	@Autowired
 	private OAuth2Service oAuth2Service;
@@ -37,19 +39,34 @@ public class AuthenticatorImpl extends DefaultRestfulService implements Authenti
 		return this.oAuth2Service;
 	}
 
+	@Autowired(required = false)
+	private AdditionalDataDAO additionalDataDAO;
+
+	private AdditionalDataDAO getAdditionalDataDAO() {
+		if (this.additionalDataDAO == null) {
+			ELUtil.getInstance().autowire(this);
+		}
+
+		return this.additionalDataDAO;
+	}
+
 	@Override
 	@POST
 	@Path(Authenticator.USER)
-	public Response getAuthenticatedUser(
-			AuthorizationCredentials credentials,
-			@Context HttpServletRequest request
-	) {
-		LoggedInUser loggedInUserData = getOAuth2Service().getAuthenticatedUser(request, credentials);
+	public Response getAuthenticatedUser(AuthorizationCredentials credentials,
+			@Context HttpServletRequest request) {
+		LoggedInUser loggedInUserData = getOAuth2Service()
+				.getAuthenticatedUser(request, credentials);
 		if (loggedInUserData == null) {
 			return getBadRequestResponse(Boolean.FALSE);
 		}
 
-		return getOKResponse(new User(loggedInUserData));
+		User user = new User(loggedInUserData);
+
+		if (getAdditionalDataDAO() != null) {
+			user = getAdditionalDataDAO().getUser(loggedInUserData);
+		}
+		return getOKResponse(user);
 	}
 
 }
