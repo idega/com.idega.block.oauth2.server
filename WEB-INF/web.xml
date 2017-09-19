@@ -21,13 +21,13 @@
 	<!-- Logout WS -->
 	<servlet>
 		<servlet-name>Token Management Service</servlet-name>
-		<servlet-class>com.sun.jersey.spi.container.servlet.ServletContainer</servlet-class>
+		<servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
 		<init-param>
-			<param-name>com.sun.jersey.config.property.packages</param-name>
+			<param-name>org.glassfish.jersey.config.property.packages</param-name>
 			<param-value>com.idega.block.oauth2.server.controller</param-value>
 		</init-param>
 		<init-param>
-			<param-name>com.sun.jersey.api.json.POJOMappingFeature</param-name>
+			<param-name>org.glassfish.jersey.api.json.POJOMappingFeature</param-name>
 			<param-value>true</param-value>
 		</init-param>
 		<load-on-startup>1</load-on-startup>
@@ -38,15 +38,15 @@
 		<servlet-name>Authentication Management Service</servlet-name>
 		<servlet-class>com.idega.block.oauth2.server.authentication.servlet.AuthenticatorServlet</servlet-class>
 		<init-param>
-			<param-name>com.sun.jersey.config.property.packages</param-name>
+			<param-name>org.glassfish.jersey.config.property.packages</param-name>
 			<param-value>com.idega.block.oauth2.server.authentication.business</param-value>
 		</init-param>
 		<init-param>
-			<param-name>com.sun.jersey.config.property.packages</param-name>
+			<param-name>org.glassfish.jersey.config.property.packages</param-name>
 			<param-value>com.idega.block.oauth2.server.authentication.bean</param-value>
 		</init-param>
 		<init-param>
-			<param-name>com.sun.jersey.api.json.POJOMappingFeature</param-name>
+			<param-name>org.glassfish.jersey.api.json.POJOMappingFeature</param-name>
 			<param-value>true</param-value>
 		</init-param>
 		<load-on-startup>1</load-on-startup>

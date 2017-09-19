@@ -1,7 +1,6 @@
 package com.idega.block.oauth2.server.authentication.servlet;
 
 import java.io.IOException;
-import java.net.URI;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
@@ -15,12 +14,6 @@ import com.idega.restful.servlet.DefaultRestfulServlet;
 public class AuthenticatorServlet extends DefaultRestfulServlet {
 
 	private static final long serialVersionUID = 1692970031413341675L;
-
-	@Override
-	public int service(URI baseUri, URI requestUri, HttpServletRequest request,
-			HttpServletResponse response) throws ServletException, IOException {
-		return super.service(baseUri, requestUri, request, response);
-	}
 
 	@Override
 	public void service(HttpServletRequest request, HttpServletResponse response)

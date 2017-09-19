@@ -102,6 +102,10 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Invocation.Builder;
+import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -145,11 +149,6 @@ import com.idega.util.StringHandler;
 import com.idega.util.StringUtil;
 import com.idega.util.datastructures.map.MapUtil;
 import com.idega.util.expression.ELUtil;
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.WebResource;
-import com.sun.jersey.api.client.config.ClientConfig;
-import com.sun.jersey.api.client.config.DefaultClientConfig;
-import com.sun.jersey.client.urlconnection.HTTPSProperties;
 
 /**
  * <p>
@@ -312,22 +311,22 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		}
 
 		OAuthToken token = null;
-		WebResource webResource = null;
+		WebTarget webResource = null;
 		try {
 			username = URLDecoder.decode(username, CoreConstants.ENCODING_UTF8);
 			password = URLDecoder.decode(password, CoreConstants.ENCODING_UTF8);
 
 			String url = getURL(serverURL);
 			Client client = getClient(url);
-			webResource = client.resource(url);
+			webResource = client.target(url);
 			webResource = webResource
 					.queryParam("grant_type", "password")
 					.queryParam("client_id", clientId)
 					.queryParam("client_secret", clientSecret)
 					.queryParam("username", URLEncoder.encode(username, CoreConstants.ENCODING_UTF8))
 					.queryParam("password", URLEncoder.encode(password, CoreConstants.ENCODING_UTF8));
-			WebResource.Builder builder = webResource.accept(MediaType.APPLICATION_JSON);
-			token = builder.post(OAuthToken.class);
+			Builder builder = webResource.request(MediaType.APPLICATION_JSON_TYPE);
+			token = builder.method("POST", OAuthToken.class);
 		} catch (Exception e) {
 			getLogger().log(Level.WARNING, "Error logging in user with username: " + username + ". Web resource: " + webResource, e);
 			return null;
@@ -372,18 +371,22 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 			} catch (Exception e) {
 			}
 
-			ClientConfig config = new DefaultClientConfig();
-			config.getProperties().put(HTTPSProperties.PROPERTY_HTTPS_PROPERTIES,
-					new HTTPSProperties(new HostnameVerifier() {
-						@Override
-						public boolean verify(String s, SSLSession sslSession) {
-							return true;
-						}
-					}, sc));
-			Client client = Client.create(config);
-			return client;
+	        ClientBuilder clientBuilder = ClientBuilder.newBuilder();
+	        try {
+	            clientBuilder.sslContext(sc);
+	            clientBuilder.hostnameVerifier(new HostnameVerifier() {
+	                @Override
+	                public boolean verify(String hostname, SSLSession session) {
+	                    return true;
+	                }
+	            });
+	        } catch (Exception e) {
+	        	throw new RuntimeException(e);
+	        }
+
+			return clientBuilder.build();
 		} else {
-			return new Client();
+			return ClientBuilder.newClient();
 		}
 	}
 
