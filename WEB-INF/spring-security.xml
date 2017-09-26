@@ -244,6 +244,7 @@
 
 	<security:http pattern="/api/afterschoolcare/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/openservices/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/portal/**" security="none" auto-config="true"/>
 	<security:http pattern="/rest/**" security="none" auto-config="true"/>
 
 	<!-- This is where we tells spring security what URL should be protected 

@@ -29,6 +29,13 @@ public class User extends LoggedInUser {
 		}
 	}
 
+	public User(com.idega.user.data.bean.User user) {
+		if (user != null) {
+			setName(user.getName());
+			setPersonalID(user.getPersonalID());
+		}
+	}
+
 	public Address getAddress() {
 		return address;
 	}
