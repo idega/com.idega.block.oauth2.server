@@ -37,7 +37,10 @@ public class Address implements Serializable {
 		if (address != null) {
 			PostalCode postalCode = address.getPostalCode();
 			Country country = address.getCountry();
-			Country countryFromPostalCode = postalCode.getCountry();
+			Country countryFromPostalCode = null;
+			if (postalCode != null) {
+				countryFromPostalCode = postalCode.getCountry();
+			}
 			initialize(
 					address.getStreetAddress(),
 					StringUtil.isEmpty(address.getCity()) ? postalCode.getName() : address.getCity(),
@@ -55,7 +58,10 @@ public class Address implements Serializable {
 		if (address != null) {
 			com.idega.core.location.data.PostalCode postalCode = address.getPostalCode();
 			com.idega.core.location.data.Country country = address.getCountry();
-			com.idega.core.location.data.Country countryFromPostalCode = postalCode.getCountry();
+			com.idega.core.location.data.Country countryFromPostalCode = null;
+			if (postalCode != null) {
+				countryFromPostalCode = postalCode.getCountry();
+			}
 			initialize(
 					address.getStreetAddress(),
 					StringUtil.isEmpty(address.getCity()) ? postalCode.getName() : address.getCity(),
