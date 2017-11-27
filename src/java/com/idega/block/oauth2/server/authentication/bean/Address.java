@@ -38,12 +38,14 @@ public class Address implements Serializable {
 			PostalCode postalCode = address.getPostalCode();
 			Country country = address.getCountry();
 			Country countryFromPostalCode = null;
+			String cityFromPostalCode = null;
 			if (postalCode != null) {
 				countryFromPostalCode = postalCode.getCountry();
+				cityFromPostalCode = postalCode.getName();
 			}
 			initialize(
 					address.getStreetAddress(),
-					StringUtil.isEmpty(address.getCity()) ? postalCode.getName() : address.getCity(),
+					StringUtil.isEmpty(address.getCity()) ? cityFromPostalCode : address.getCity(),
 					postalCode == null ? null : postalCode.getPostalCode(),
 					country == null ? countryFromPostalCode == null ? null : countryFromPostalCode.getName(locale) : country.getName(locale),
 					country == null ? countryFromPostalCode == null ? null : countryFromPostalCode.getId() : country.getId(),
@@ -59,12 +61,14 @@ public class Address implements Serializable {
 			com.idega.core.location.data.PostalCode postalCode = address.getPostalCode();
 			com.idega.core.location.data.Country country = address.getCountry();
 			com.idega.core.location.data.Country countryFromPostalCode = null;
+			String cityFromPostalCode = null;
 			if (postalCode != null) {
 				countryFromPostalCode = postalCode.getCountry();
+				cityFromPostalCode = postalCode.getName();
 			}
 			initialize(
 					address.getStreetAddress(),
-					StringUtil.isEmpty(address.getCity()) ? postalCode.getName() : address.getCity(),
+					StringUtil.isEmpty(address.getCity()) ? cityFromPostalCode : address.getCity(),
 					postalCode == null ? null : postalCode.getPostalCode(),
 					country == null ? countryFromPostalCode == null ? null : countryFromPostalCode.getName(locale) : country.getName(locale),
 					country == null ? countryFromPostalCode == null ? null : Integer.valueOf(countryFromPostalCode.getPrimaryKey().toString()) : Integer.valueOf(country.getPrimaryKey().toString()),
