@@ -244,11 +244,24 @@
 
 	<security:http pattern="/api/afterschoolcare/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/openservices/**" security="none" auto-config="true"/>
-	
-	<security:http pattern="/rest/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/leaderboard/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/leaderboard/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/golferSearch/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/golferSearch/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/tournamentList/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/tournamentList/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/tournamentTourList/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/tournamentTourList/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/areas/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/areas/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/clubs/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/clubs/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/clubNews/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/clubNews/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/tournamentResult/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/tournament//**" security="none" auto-config="true"/>
 
-	<!-- This is where we tells spring security what URL should be protected 
-		and what roles have access to them -->
+	<!-- This is where we tells spring security what URL should be protected and which roles have access to them -->
 	<security:http
 		pattern="/api/**"
 		create-session="never"
@@ -264,7 +277,6 @@
 			before="PRE_AUTH_FILTER" />
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
 	</security:http>
-
     <security:http
         pattern="/rest/member/save/**"
         create-session="never"
@@ -280,7 +292,6 @@
             before="PRE_AUTH_FILTER" />
         <security:access-denied-handler ref="oauthAccessDeniedHandler" />
     </security:http>
-    
     <security:http
         pattern="/rest/member/save/members/**"
         create-session="never"
@@ -296,7 +307,21 @@
             before="PRE_AUTH_FILTER" />
         <security:access-denied-handler ref="oauthAccessDeniedHandler" />
     </security:http>
-
+    <security:http
+		pattern="/rest/**"
+		create-session="never"
+		entry-point-ref="oauthAuthenticationEntryPoint"
+		access-decision-manager-ref="accessDecisionManager"
+		xmlns="http://www.springframework.org/schema/security">
+		<security:anonymous enabled="false" />
+		<security:intercept-url
+			pattern="/rest/**"
+			access="ROLE_APP" />
+		<security:custom-filter
+			ref="resourceServerFilter"
+			before="PRE_AUTH_FILTER" />
+		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
+	</security:http>
 	<security:http
 		pattern="/central/**"
 		create-session="never"
@@ -312,7 +337,6 @@
 			before="PRE_AUTH_FILTER" />
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
 	</security:http>
-
 	<security:http
 		pattern="/parents/**"
 		create-session="never"
@@ -328,7 +352,6 @@
 			before="PRE_AUTH_FILTER" />
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
 	</security:http>
-
 	<security:http
 		pattern="/trainer/**"
 		create-session="never"
@@ -344,7 +367,6 @@
 			before="PRE_AUTH_FILTER" />
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
 	</security:http>
-	
 	<security:http
 		pattern="/club/**"
 		create-session="never"
@@ -360,23 +382,6 @@
 			before="PRE_AUTH_FILTER" />
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
 	</security:http>
-
-	<!-- <security:http
-		pattern="/mobile/**"
-		create-session="never"
-		entry-point-ref="oauthAuthenticationEntryPoint"
-		access-decision-manager-ref="accessDecisionManager"
-		xmlns="http://www.springframework.org/schema/security">
-		<security:anonymous enabled="false" />
-		<security:intercept-url
-			pattern="/mobile/**"
-			access="ROLE_APP" />
-		<security:custom-filter
-			ref="resourceServerFilter"
-			before="PRE_AUTH_FILTER" />
-		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
-	</security:http> -->
-
 	<security:http
 		pattern="/token/**"
 		create-session="never"
