@@ -12,7 +12,7 @@ import com.idega.block.login.bean.OAuthToken;
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AccessToken implements Serializable {
 
-	private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = -5678966660215531673L;
 
 	private OAuthToken token;
 
