@@ -9,6 +9,8 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 import com.idega.core.location.data.bean.Country;
 import com.idega.core.location.data.bean.PostalCode;
+import com.idega.idegaweb.IWMainApplication;
+import com.idega.idegaweb.IWMainApplicationSettings;
 import com.idega.util.CoreConstants;
 import com.idega.util.StringUtil;
 
@@ -101,15 +103,21 @@ public class Address implements Serializable {
 				addressLabel.append(getPostalCode());
 			}
 
-			if (!StringUtil.isEmpty(getCity())) {
-				addressLabel.append(CoreConstants.SPACE);
-				addressLabel.append(getCity());
+			IWMainApplicationSettings settings = IWMainApplication.getDefaultIWMainApplication().getSettings();
+
+			if (settings.getBoolean("add_city_to_address_label", true)) {
+				if (!StringUtil.isEmpty(getCity())) {
+					addressLabel.append(CoreConstants.SPACE);
+					addressLabel.append(getCity());
+				}
 			}
 
-			if (!StringUtil.isEmpty(getCountry())) {
-				addressLabel.append(CoreConstants.COMMA);
-				addressLabel.append(CoreConstants.SPACE);
-				addressLabel.append(getCountry());
+			if (settings.getBoolean("add_country_to_address_label", true)) {
+				if (!StringUtil.isEmpty(getCountry())) {
+					addressLabel.append(CoreConstants.COMMA);
+					addressLabel.append(CoreConstants.SPACE);
+					addressLabel.append(getCountry());
+				}
 			}
 		}
 		setFullAddress(addressLabel.toString());
