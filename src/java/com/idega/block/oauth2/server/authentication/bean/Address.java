@@ -97,13 +97,15 @@ public class Address implements Serializable {
 		if (!StringUtil.isEmpty(getStreetAddress())) {
 			addressLabel.append(getStreetAddress());
 
-			if (!StringUtil.isEmpty(getPostalCode())) {
-				addressLabel.append(CoreConstants.COMMA);
-				addressLabel.append(CoreConstants.SPACE);
-				addressLabel.append(getPostalCode());
-			}
-
 			IWMainApplicationSettings settings = IWMainApplication.getDefaultIWMainApplication().getSettings();
+
+			if (settings.getBoolean("add_postal_to_address_label", true)) {
+				if (!StringUtil.isEmpty(getPostalCode())) {
+					addressLabel.append(CoreConstants.COMMA);
+					addressLabel.append(CoreConstants.SPACE);
+					addressLabel.append(getPostalCode());
+				}
+			}
 
 			if (settings.getBoolean("add_city_to_address_label", true)) {
 				if (!StringUtil.isEmpty(getCity())) {
