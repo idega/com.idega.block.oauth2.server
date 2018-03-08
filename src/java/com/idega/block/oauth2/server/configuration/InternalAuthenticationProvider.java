@@ -21,6 +21,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import com.idega.block.login.data.dao.PasswordTokenEntityDAO;
+import com.idega.block.user.bean.UserCredentials;
+import com.idega.block.user.data.dao.UserCredentialsDAO;
 import com.idega.core.accesscontrol.business.LoginBusinessBean;
 import com.idega.core.accesscontrol.business.LoginDBHandler;
 import com.idega.core.accesscontrol.data.LoginTable;
@@ -32,6 +34,7 @@ import com.idega.servlet.filter.RequestResponseProvider;
 import com.idega.user.dao.UserDAO;
 import com.idega.user.data.bean.User;
 import com.idega.util.CoreUtil;
+import com.idega.util.StringUtil;
 import com.idega.util.expression.ELUtil;
 
 @Component
@@ -45,9 +48,23 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 	@Autowired
 	private UserDAO userDao;
 
+	@Autowired(required = false)
+	private UserCredentialsDAO userCredentialsDAO = null;
+
+	private UserCredentialsDAO getUserCredentialsDAO() {
+		if (this.userCredentialsDAO == null) {
+			try {
+				ELUtil.getInstance().autowire(this);
+			} catch (Exception e) {}
+		}
+
+		return this.userCredentialsDAO;
+	}
+
 	public UserDAO getUserDao() {
-		if (userDao == null)
+		if (userDao == null) {
 			ELUtil.getInstance().autowire(this);
+		}
 		return userDao;
 	}
 
@@ -146,6 +163,24 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		return null;
 	}
 
+	private Authentication getAuthentication(String username) {
+		if (StringUtil.isEmpty(username)) {
+			return null;
+		}
+
+		UserCredentialsDAO credentialsDAO = getUserCredentialsDAO();
+		if (credentialsDAO == null) {
+			return null;
+		}
+
+		UserCredentials credentials = credentialsDAO.getUserCredentials(username);
+		if (credentials == null || StringUtil.isEmpty(credentials.getUsername()) || StringUtil.isEmpty(credentials.getPassword())) {
+			return null;
+		}
+
+		return getAuthentication(credentials.getUsername(), credentials.getPassword());
+	}
+
 	@Override
 	public Authentication authenticate(Authentication authentication) throws AuthenticationException {
 		String providedLogin = authentication.getName();
@@ -156,7 +191,7 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 			token = (String) details.get("token");
 		}
 		if (token == null) {
-			return null;
+			return getAuthentication(providedLogin);
 		}
 
 		User user = getAuthenticatedUser(authentication);
@@ -189,6 +224,10 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 			return null;
 		}
 
+		return getAuthentication(login, password);
+	}
+
+	private Authentication getAuthentication(String login, String password) {
 		List<GrantedAuthority> grantedAuths = new ArrayList<>();
 		grantedAuths.add(new SimpleGrantedAuthority("ROLE_APP"));
 		org.springframework.security.core.userdetails.User loggedInUser = new org.springframework.security.core.userdetails.User(
@@ -206,12 +245,14 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 	}
 
 	public PasswordTokenEntityDAO getPasswordTokenEntityDAO() {
-		if (passwordTokenEntityDAO == null)
+		if (passwordTokenEntityDAO == null) {
 			ELUtil.getInstance().autowire(this);
+		}
 		return passwordTokenEntityDAO;
 	}
 
 	public void setPasswordTokenEntityDAO(PasswordTokenEntityDAO passwordTokenEntityDAO) {
 		this.passwordTokenEntityDAO = passwordTokenEntityDAO;
 	}
+
 }
