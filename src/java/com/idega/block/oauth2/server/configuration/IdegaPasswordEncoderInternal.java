@@ -82,13 +82,11 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Scope;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.idega.core.accesscontrol.dao.UserLoginDAO;
 import com.idega.util.CoreConstants;
 import com.idega.util.Encrypter;
 
@@ -107,9 +105,6 @@ import com.idega.util.Encrypter;
 @Scope(BeanDefinition.SCOPE_SINGLETON)
 @Service("idegaEncoderInternal")
 public class IdegaPasswordEncoderInternal implements PasswordEncoder {
-
-	@Autowired
-	private UserLoginDAO userLoginDAO;
 
 	public IdegaPasswordEncoderInternal() {
 	}
@@ -153,16 +148,7 @@ public class IdegaPasswordEncoderInternal implements PasswordEncoder {
 			str += hex;
 		}
 
-		boolean theSame = str.equals(encodedPassword);
-
-		// if (theSame) {
-		// UserLogin login = userLoginDAO.findByPassword(str);
-		// if (login != null) {
-		// return true;
-		// }
-		// }
-
-		return theSame;
+		return str.equals(encodedPassword);
 	}
 
 }
