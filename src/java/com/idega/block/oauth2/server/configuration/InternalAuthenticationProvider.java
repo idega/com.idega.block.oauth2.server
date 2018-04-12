@@ -122,11 +122,23 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		LoginTable loginTable = null;
 		try {
 			loginTable = getLoginTableHome().findByLogin(login);
-		} catch (FinderException e) {
+		} catch (FinderException e) {}
+
+		com.idega.user.data.bean.User user = null;
+		if (loginTable == null) {
+			UserCredentials credentials = getUserCredentialsDAO().getUserCredentials(login, null);
+			if (credentials != null) {
+				Integer userId = credentials.getUserId();
+				if (userId != null) {
+					user = getUserDao().getUser(userId);
+				}
+			}
+		} else {
+			user = getUserDao().getUser(loginTable.getUserId());
+		}
+		if (user == null) {
 			throw new IllegalStateException("User by login name " + login + " was not found");
 		}
-
-		com.idega.user.data.bean.User user = getUserDao().getUser(loginTable.getUserId());
 
 		IWContext iwc = CoreUtil.getIWContext();
 		if (iwc == null) {
@@ -173,7 +185,13 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 			return null;
 		}
 
-		UserCredentials credentials = credentialsDAO.getUserCredentials(username);
+		String password = null;
+		IWContext iwc = CoreUtil.getIWContext();
+		if (iwc != null) {
+			password = iwc.getParameter("password");
+		}
+
+		UserCredentials credentials = credentialsDAO.getUserCredentials(username, password);
 		if (credentials == null || StringUtil.isEmpty(credentials.getUsername()) || StringUtil.isEmpty(credentials.getPassword())) {
 			return null;
 		}

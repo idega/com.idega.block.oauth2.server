@@ -82,15 +82,27 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.oauth2.provider.ClientDetails;
 import org.springframework.security.oauth2.provider.ClientDetailsService;
 import org.springframework.security.oauth2.provider.client.ClientDetailsUserDetailsService;
+import org.springframework.security.oauth2.provider.client.JdbcClientDetailsService;
 
 import com.idega.block.oauth2.server.data.Member;
 import com.idega.block.user.bean.UserCredentials;
 import com.idega.block.user.data.dao.UserCredentialsDAO;
+import com.idega.servlet.filter.RequestResponseProvider;
+import com.idega.util.ListUtil;
+import com.idega.util.StringUtil;
 import com.idega.util.expression.ELUtil;
 
 /**
@@ -116,6 +128,31 @@ public class IdegaUserDetailsService extends ClientDetailsUserDetailsService {
 		return this.userCredentialsDAO;
 	}
 
+	@Autowired(required=false)
+	@Qualifier("clientDetails")
+	private JdbcClientDetailsService clientDetailsService;
+
+	private JdbcClientDetailsService getClientDetailsService() {
+		if (this.clientDetailsService == null) {
+			ELUtil.getInstance().autowire(this);
+		}
+
+		return clientDetailsService;
+	}
+
+	private List<String> getClientsIds() {
+		List<ClientDetails> details = getClientDetailsService().listClientDetails();
+		if (ListUtil.isEmpty(details)) {
+			return Collections.emptyList();
+		}
+
+		List<String> ids = new ArrayList<>();
+		for (ClientDetails detail: details) {
+			ids.add(detail.getClientId());
+		}
+		return ids;
+	}
+
 	public IdegaUserDetailsService(ClientDetailsService clientDetailsService) {
 		super(clientDetailsService);
 	}
@@ -126,9 +163,23 @@ public class IdegaUserDetailsService extends ClientDetailsUserDetailsService {
 	 */
 	@Override
 	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		String userLogin = null, password = null;
+		RequestResponseProvider rrProvider = null;
+		try {
+			rrProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
+			HttpServletRequest request = rrProvider.getRequest();
+			userLogin = request == null ? null : request.getParameter("username");
+			password = request == null ? null : request.getParameter("password");
+		} catch (Exception e) {}
+
 		if (getUserCredentialsDAO() != null) {
-			UserCredentials credentials = getUserCredentialsDAO().getUserCredentials(username);
+			UserCredentials credentials = getUserCredentialsDAO().getUserCredentials(StringUtil.isEmpty(userLogin) ? username : userLogin, password);
 			if (credentials != null) {
+				List<String> clientsIds = getClientsIds();
+				if (!ListUtil.isEmpty(clientsIds) && clientsIds.contains(username)) {
+					credentials = new UserCredentials(credentials.getUserId(), username, username, credentials.isEnabled());
+				}
+
 				return new Member(credentials);
 			}
 		}

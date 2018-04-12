@@ -84,6 +84,7 @@ package com.idega.block.oauth2.server.data;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -111,9 +112,13 @@ public class Member implements UserDetails {
 
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {
-		ArrayList<SimpleGrantedAuthority> list = new ArrayList<>();
+		List<SimpleGrantedAuthority> list = new ArrayList<>();
 		list.add(new SimpleGrantedAuthority("ROLE_APP"));
 		return list;
+	}
+
+	public Integer getUserId() {
+		return credentials.getUserId();
 	}
 
 	@Override
