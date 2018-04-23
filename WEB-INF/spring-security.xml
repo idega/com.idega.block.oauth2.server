@@ -260,6 +260,7 @@
 	<security:http pattern="/api/clubNews/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/tournamentResult/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/tournament/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/member/**" security="none" auto-config="true"/>
 
 	<!-- This is where we tells spring security what URL should be protected and which roles have access to them -->
 	<security:http
@@ -277,36 +278,6 @@
 			before="PRE_AUTH_FILTER" />
 		<security:access-denied-handler ref="oauthAccessDeniedHandler" />
 	</security:http>
-    <security:http
-        pattern="/rest/member/save/**"
-        create-session="never"
-        entry-point-ref="oauthAuthenticationEntryPoint"
-        access-decision-manager-ref="accessDecisionManager"
-        xmlns="http://www.springframework.org/schema/security">
-        <security:anonymous enabled="false" />
-        <security:intercept-url
-            pattern="/rest/member/save/**"
-            access="ROLE_APP" />
-        <security:custom-filter
-            ref="resourceServerFilter"
-            before="PRE_AUTH_FILTER" />
-        <security:access-denied-handler ref="oauthAccessDeniedHandler" />
-    </security:http>
-    <security:http
-        pattern="/rest/member/save/members/**"
-        create-session="never"
-        entry-point-ref="oauthAuthenticationEntryPoint"
-        access-decision-manager-ref="accessDecisionManager"
-        xmlns="http://www.springframework.org/schema/security">
-        <security:anonymous enabled="false" />
-        <security:intercept-url
-            pattern="/rest/member/save/members/**"
-            access="ROLE_APP" />
-        <security:custom-filter
-            ref="resourceServerFilter"
-            before="PRE_AUTH_FILTER" />
-        <security:access-denied-handler ref="oauthAccessDeniedHandler" />
-    </security:http>
     <security:http
 		pattern="/rest/**"
 		create-session="never"
