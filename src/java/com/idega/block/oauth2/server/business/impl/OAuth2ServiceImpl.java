@@ -459,6 +459,28 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 			Authentication authResult = authenticationProvider.getAuthentication(login, credentials.getUserName());
 
 			HttpServletRequest request = credentials.getRequest();
+			return createAccessToken(authResult, request, clientId, login.getUserLogin());
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error creating access token for credentials " + credentials, e);
+		}
+
+		return null;
+	}
+
+	@Override
+	public OAuthToken getToken(HttpServletRequest request, String clientId, String username, String password) {
+		try {
+			Authentication authResult = authenticationProvider.getAuthentication(username, password);
+			return createAccessToken(authResult, request, clientId, username);
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error creating access token for username " + username, e);
+		}
+
+		return null;
+	}
+
+	private OAuthToken createAccessToken(Authentication authResult, HttpServletRequest request, String clientId, String username) {
+		try {
 			Map<String, String> map = getSingleValueMap(request);
 			map.put(OAuth2Utils.CLIENT_ID, clientId);
 			AuthorizationRequest authorizationRequest = oAuth2RequestFactory.createAuthorizationRequest(map);
@@ -483,10 +505,10 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 				getCache().put(clientId, tokens);
 			}
 			OAuthToken token = new OAuth2AccessTokenBean(accessToken, authorizationRequest);
-			tokens.put(login.getUserLogin(), token);
+			tokens.put(username, token);
 			return token;
 		} catch (Exception e) {
-			getLogger().log(Level.WARNING, "Error creating access token for " + credentials, e);
+			getLogger().log(Level.WARNING, "Error creating access token for username " + username + ", client ID: " + clientId, e);
 		}
 
 		return null;
@@ -594,6 +616,21 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 			return loggedInUser;
 		} catch (Exception e) {
 			getLogger().log(Level.WARNING, "Error while logging in " + credentials.getUsername(), e);
+		}
+
+		return null;
+	}
+
+	@Override
+	public Object getAuthentication(String token) {
+		if (StringUtil.isEmpty(token)) {
+			return null;
+		}
+
+		try {
+			return tokenServices.loadAuthentication(token);
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error getting authentication for access token " + token, e);
 		}
 
 		return null;

@@ -245,7 +245,7 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		return getAuthentication(login, password);
 	}
 
-	private Authentication getAuthentication(String login, String password) {
+	public Authentication getAuthentication(String login, String password) {
 		List<GrantedAuthority> grantedAuths = new ArrayList<>();
 		grantedAuths.add(new SimpleGrantedAuthority("ROLE_APP"));
 		org.springframework.security.core.userdetails.User loggedInUser = new org.springframework.security.core.userdetails.User(
