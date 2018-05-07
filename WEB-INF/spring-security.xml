@@ -261,6 +261,8 @@
 	<security:http pattern="/api/tournamentResult/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/tournament/**" security="none" auto-config="true"/>
 	<security:http pattern="/rest/member/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/teeTimeBooking/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/teeTimeBooking/**" security="none" auto-config="true"/>
 
 	<!-- This is where we tells spring security what URL should be protected and which roles have access to them -->
 	<security:http
