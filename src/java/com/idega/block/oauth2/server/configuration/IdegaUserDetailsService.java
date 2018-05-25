@@ -168,11 +168,11 @@ public class IdegaUserDetailsService extends ClientDetailsUserDetailsService {
 		try {
 			rrProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
 			HttpServletRequest request = rrProvider.getRequest();
-			userLogin = request == null ? null : request.getParameter("username");
-			userLogin = StringUtil.isEmpty(userLogin) ? request == null ? null : request.getHeader("username") : userLogin;
+			userLogin = request == null ? null : request.getHeader("username");
+			userLogin = StringUtil.isEmpty(userLogin) ? request == null ? null : request.getParameter("username") : userLogin;
 
-			password = request == null ? null : request.getParameter("password");
-			password = StringUtil.isEmpty(password) ? request == null ? null : request.getHeader("password") : password;
+			password = request == null ? null : request.getHeader("password");
+			password = StringUtil.isEmpty(password) ? request == null ? null : request.getParameter("password") : password;
 		} catch (Exception e) {}
 
 		if (getUserCredentialsDAO() != null) {
