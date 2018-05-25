@@ -169,7 +169,10 @@ public class IdegaUserDetailsService extends ClientDetailsUserDetailsService {
 			rrProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
 			HttpServletRequest request = rrProvider.getRequest();
 			userLogin = request == null ? null : request.getParameter("username");
+			userLogin = StringUtil.isEmpty(userLogin) ? request == null ? null : request.getHeader("username") : userLogin;
+
 			password = request == null ? null : request.getParameter("password");
+			password = StringUtil.isEmpty(password) ? request == null ? null : request.getHeader("password") : password;
 		} catch (Exception e) {}
 
 		if (getUserCredentialsDAO() != null) {
