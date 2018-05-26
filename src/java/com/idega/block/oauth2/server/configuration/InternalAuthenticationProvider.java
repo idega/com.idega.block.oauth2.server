@@ -188,7 +188,14 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		String password = null;
 		IWContext iwc = CoreUtil.getIWContext();
 		if (iwc != null) {
-			password = iwc.getParameter("password");
+			HttpServletRequest request = iwc.getRequest();
+			String userName = request == null ? null : request.getHeader("username");
+			if (!StringUtil.isEmpty(userName) && !"undefined".equals(userName) && !userName.equals(username)) {
+				username = userName;
+			}
+
+			password = request == null ? null : request.getHeader("password");
+			password = StringUtil.isEmpty(password) || "undefined".equals(password) ? iwc.getParameter("password") : password;
 		}
 
 		UserCredentials credentials = credentialsDAO.getUserCredentials(username, password);
