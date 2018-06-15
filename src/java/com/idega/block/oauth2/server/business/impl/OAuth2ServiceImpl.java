@@ -105,6 +105,7 @@ import javax.servlet.http.HttpSession;
 import javax.ws.rs.core.MediaType;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Scope;
@@ -113,11 +114,15 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.common.OAuth2RefreshToken;
 import org.springframework.security.oauth2.common.util.OAuth2Utils;
 import org.springframework.security.oauth2.provider.AuthorizationRequest;
+import org.springframework.security.oauth2.provider.ClientDetails;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.OAuth2Request;
 import org.springframework.security.oauth2.provider.OAuth2RequestFactory;
+import org.springframework.security.oauth2.provider.TokenRequest;
+import org.springframework.security.oauth2.provider.client.JdbcClientDetailsService;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.stereotype.Service;
 
@@ -174,6 +179,18 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 	@Autowired(required = false)
 	private IdegaDefaultTokenServices tokenServices;
+
+	@Autowired(required = false)
+	@Qualifier("clientDetails")
+	private JdbcClientDetailsService clientDetailsService;
+
+	private JdbcClientDetailsService getClientDetailsService() {
+		if (this.clientDetailsService == null) {
+			ELUtil.getInstance().autowire(this);
+		}
+
+		return clientDetailsService;
+	}
 
 	private LoginBusinessBean getLoginBusinessBean() {
 		if (this.loginBusinessBean == null) {
@@ -621,16 +638,57 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		return null;
 	}
 
+	private OAuth2AccessToken getRefreshedToken(OAuth2AccessToken expiredAccessToken, String clientId) throws Exception {
+		if (expiredAccessToken == null) {
+			return null;
+		}
+
+		OAuth2RefreshToken refreshToken = expiredAccessToken.getRefreshToken();
+		if (refreshToken == null || StringUtil.isEmpty(refreshToken.getValue())) {
+			getLogger().warning("Invalid refresh token " + refreshToken + " for access token: " + expiredAccessToken);
+			return null;
+		}
+
+		Map<String, String> parameters = new HashMap<>();
+		parameters.put(OAuth2Utils.CLIENT_ID, clientId);
+		parameters.put(OAuth2Utils.GRANT_TYPE, "password,authorization_code,refresh_token,implicit");
+		ClientDetails clientDetails = getClientDetailsService().loadClientByClientId(clientId);
+		Set<String> scope = clientDetails.getScope();
+		parameters.put(OAuth2Utils.SCOPE, OAuth2Utils.formatParameterList(scope));
+		TokenRequest tokenRequest = oAuth2RequestFactory.createTokenRequest(parameters, clientDetails);
+		tokenRequest.setScope(null);
+		OAuth2AccessToken refreshedAccessToken = tokenServices.refreshAccessToken(refreshToken.getValue(), tokenRequest);
+		return refreshedAccessToken;
+	}
+
 	@Override
-	public Object getAuthentication(String token) {
+	public Object getAuthentication(String token, String clientId) {
 		if (StringUtil.isEmpty(token)) {
 			return null;
 		}
 
+		boolean triedToRefresh = false;
 		try {
+			OAuth2AccessToken accessToken = tokenServices.readAccessToken(token);
+			if (accessToken == null) {
+				getLogger().warning("Invalid token: " + token);
+				return null;
+			}
+
+			if (accessToken.isExpired()) {
+				triedToRefresh = true;
+				OAuth2AccessToken refreshedAccessToken = getRefreshedToken(accessToken, clientId);
+				if (refreshedAccessToken == null) {
+					getLogger().warning("Unable to refresh expired access token: " + accessToken + ", token: " + token);
+					return null;
+				}
+
+				token = refreshedAccessToken.getValue();
+			}
+
 			return tokenServices.loadAuthentication(token);
 		} catch (Exception e) {
-			getLogger().log(Level.WARNING, "Error getting authentication for access token " + token, e);
+			getLogger().log(Level.WARNING, "Error getting authentication for access token '" + token + "'. Tried to refresh: " + triedToRefresh, e);
 		}
 
 		return null;
