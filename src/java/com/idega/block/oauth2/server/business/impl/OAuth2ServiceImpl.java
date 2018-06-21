@@ -686,7 +686,8 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 				token = refreshedAccessToken.getValue();
 			}
 
-			return tokenServices.loadAuthentication(token);
+			OAuth2Authentication authentication = tokenServices.loadAuthentication(token);
+			return new com.idega.block.oauth2.server.authentication.bean.Authentication(token, authentication);
 		} catch (Exception e) {
 			getLogger().log(Level.WARNING, "Error getting authentication for access token '" + token + "'. Tried to refresh: " + triedToRefresh, e);
 		}
