@@ -260,6 +260,8 @@
 	<security:http pattern="/api/clubNews/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/tournamentResult/**" security="none" auto-config="true"/>
 	<security:http pattern="/rest/tournamentResult/**" security="none" auto-config="true"/>
+	<security:http pattern="/api/tournamentTeeTimes/**" security="none" auto-config="true"/>
+	<security:http pattern="/rest/tournamentTeeTimes/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/tournament/**" security="none" auto-config="true"/>
 	<security:http pattern="/rest/member/**" security="none" auto-config="true"/>
 	<security:http pattern="/rest/teeTimeBooking/**" security="none" auto-config="true"/>
