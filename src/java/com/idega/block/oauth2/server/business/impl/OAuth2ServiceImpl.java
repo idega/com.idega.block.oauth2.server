@@ -616,7 +616,8 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 					credentials.getUsername(),
 					credentials.getPassword(),
 					null,
-					loginId
+					loginId,
+					null
 			);
 			OAuthToken token = getToken(credentials.getClientId(), loggedInUserCredentials);
 			if (token == null) {
