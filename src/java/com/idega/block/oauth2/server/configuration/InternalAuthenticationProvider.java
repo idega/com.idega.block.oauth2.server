@@ -34,6 +34,7 @@ import com.idega.servlet.filter.RequestResponseProvider;
 import com.idega.user.dao.UserDAO;
 import com.idega.user.data.bean.User;
 import com.idega.util.CoreUtil;
+import com.idega.util.Encrypter;
 import com.idega.util.StringUtil;
 import com.idega.util.expression.ELUtil;
 
@@ -106,13 +107,14 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 			throw new IllegalStateException("Failed to get user from security context");
 		}
 
-		String login = null;
+		String login = null, password = null;
 		if (rawPrincipal instanceof org.springframework.security.core.userdetails.User) {
 			org.springframework.security.core.userdetails.User principal = (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
 			if (principal == null) {
 				throw new IllegalStateException("Failed to get user from security context");
 			}
 			login = principal.getUsername();
+			password = principal.getPassword();
 		} else if (rawPrincipal instanceof String) {
 			login = (String) rawPrincipal;
 		} else {
@@ -123,10 +125,17 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		try {
 			loginTable = getLoginTableHome().findByLogin(login);
 		} catch (FinderException e) {}
+		if (loginTable != null && !StringUtil.isEmpty(password)) {
+			String encryptedPassword = Encrypter.encryptOneWay(password);
+			String userPassword = loginTable.getUserPassword();
+			if (StringUtil.isEmpty(userPassword) || !encryptedPassword.equals(userPassword)) {
+				loginTable = null;
+			}
+		}
 
 		com.idega.user.data.bean.User user = null;
 		if (loginTable == null) {
-			UserCredentials credentials = getUserCredentialsDAO().getUserCredentials(login, null);
+			UserCredentials credentials = getUserCredentialsDAO().getUserCredentials(login, password);
 			if (credentials != null) {
 				Integer userId = credentials.getUserId();
 				if (userId != null) {
