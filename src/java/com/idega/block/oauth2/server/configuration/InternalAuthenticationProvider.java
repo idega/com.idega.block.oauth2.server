@@ -126,10 +126,22 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 			loginTable = getLoginTableHome().findByLogin(login);
 		} catch (FinderException e) {}
 		if (loginTable != null && !StringUtil.isEmpty(password)) {
-			String encryptedPassword = Encrypter.encryptOneWay(password);
 			String userPassword = loginTable.getUserPassword();
-			if (StringUtil.isEmpty(userPassword) || !encryptedPassword.equals(userPassword)) {
+			if (StringUtil.isEmpty(userPassword)) {
 				loginTable = null;
+			} else {
+				if (userPassword.equals(password)) {
+					//	OK!
+				} else {
+					//	Double checking
+					String encryptedPassword = Encrypter.encryptOneWay(password);
+					if (encryptedPassword.equals(userPassword)) {
+						//	OK!
+					} else {
+						//	Passwords do not match
+						loginTable = null;
+					}
+				}
 			}
 		}
 
@@ -253,7 +265,7 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 			return null;
 		}
 
-		password = loginTable.getUserPasswordInClearText();
+		password = loginTable.getUserPassword();
 		if (password == null) {
 			return null;
 		}
