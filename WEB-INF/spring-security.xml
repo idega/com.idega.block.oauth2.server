@@ -242,7 +242,7 @@
 		</constructor-arg>
 	</bean>
 
-	<security:http pattern="/cybercom/**" security="none" auto-config="true"/>
+	<security:http pattern="/company/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/afterschoolcare/**" security="none" auto-config="true"/>
 	<security:http pattern="/api/openservices/**" security="none" auto-config="true"/>
 	<security:http pattern="/rest/leaderboard/**" security="none" auto-config="true"/>
