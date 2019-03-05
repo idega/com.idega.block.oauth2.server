@@ -82,6 +82,7 @@
  */
 package com.idega.block.oauth2.server.business.impl;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.security.SecureRandom;
@@ -304,55 +305,84 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	@Override
 	public OAuthToken getToken(String serverURL, String clientId, String clientSecret, String username, String password) {
 		if (StringUtil.isEmpty(serverURL)) {
-			return null;
-		}
-		if (StringUtil.isEmpty(username)) {
-			return null;
-		}
-		if (StringUtil.isEmpty(password)) {
-			return null;
+			throw new IllegalArgumentException("Server URL is not provided!");
 		}
 
 		if (StringUtil.isEmpty(clientId)) {
 			clientId = getDefaultClientId();
 		}
 		if (StringUtil.isEmpty(clientId)) {
-			getLogger().warning("Client's ID is not provided and unknown from app's properties - can not create token for username " + username);
-			return null;
+			throw new IllegalArgumentException(String.format("Client's ID is not provided and unknown from app's properties - can not create token for username: '%s'!", username));
 		}
+
 		if (StringUtil.isEmpty(clientSecret)) {
 			clientSecret = getDefaultSecret();
 		}
+
 		if (StringUtil.isEmpty(clientSecret)) {
-			getLogger().warning("Client's secret is not provided and unknown from app's properties - can not create token for username " + username);
-			return null;
+			throw new IllegalArgumentException(String.format("Client's secret is not provided and unknown from app's properties - can not create token for username: '%s'! ", username));
 		}
 
+		/*
+		 * Username
+		 */
+		if (StringUtil.isEmpty(username)) {
+			throw new IllegalArgumentException("Username is not provided!");
+		}
+
+		/*
+		 * Password
+		 */
+		if (StringUtil.isEmpty(password)) {
+			throw new IllegalArgumentException("Password is not provided!");
+		}
+		
 		OAuthToken token = null;
 		WebResource webResource = null;
+
 		try {
 			username = URLDecoder.decode(username, CoreConstants.ENCODING_UTF8);
-			password = URLDecoder.decode(password, CoreConstants.ENCODING_UTF8);
+		} catch (UnsupportedEncodingException e1) {
+			throw new IllegalArgumentException("Impossible to decode username");
+		}
 
-			String url = getURL(serverURL);
-			Client client = getClient(url);
-			webResource = client.resource(url);
-			webResource = webResource
-					.queryParam("grant_type", "password")
-					.queryParam("client_id", clientId)
-					.queryParam("client_secret", clientSecret)
-					.queryParam("username", URLEncoder.encode(username, CoreConstants.ENCODING_UTF8))
-					.queryParam("password", URLEncoder.encode(password, CoreConstants.ENCODING_UTF8));
-			WebResource.Builder builder = webResource.accept(MediaType.APPLICATION_JSON);
+		try {
+			username = URLEncoder.encode(username, CoreConstants.ENCODING_UTF8);
+		} catch (UnsupportedEncodingException e2) {
+			throw new IllegalArgumentException("Impossible to encode username");
+		}
+
+		try {
+			password = URLDecoder.decode(password, CoreConstants.ENCODING_UTF8);
+		} catch (UnsupportedEncodingException e1) {
+			throw new IllegalArgumentException("Impossible to decode password");
+		}
+
+		try {
+			password = URLEncoder.encode(password, CoreConstants.ENCODING_UTF8);
+		} catch (UnsupportedEncodingException e1) {
+			throw new IllegalArgumentException("Impossible to encode password");
+		}
+
+		String url = getURL(serverURL);
+		Client client = getClient(url);
+		webResource = client.resource(url);
+		webResource = webResource
+				.queryParam("grant_type", "password")
+				.queryParam("client_id", clientId)
+				.queryParam("client_secret", clientSecret)
+				.queryParam("username", username)
+				.queryParam("password", password);
+		WebResource.Builder builder = webResource.accept(MediaType.APPLICATION_JSON);
+
+		try {
 			token = builder.post(OAuthToken.class);
 		} catch (Exception e) {
-			getLogger().log(Level.WARNING, "Error logging in user with username: " + username + ". Web resource: " + webResource, e);
-			return null;
+			throw new IllegalStateException("Failed to get token!", e);
 		}
 
 		if (token == null || StringUtil.isEmpty(token.getAccess_token())) {
-			getLogger().warning("Error getting authentication token for username " + username + ". Web resource: " + webResource);
-			return null;
+			throw new IllegalStateException("Failed to get token!");
 		}
 
 		return token;
@@ -407,13 +437,13 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	@Override
 	public void onApplicationEvent(LoggedInUserCredentials credentials) {
 		if (credentials == null) {
-			return;
+			throw new IllegalStateException("Credentials is not provided!");
 		}
 
-		IWMainApplicationSettings settings = getSettings();
-		if (!settings.getBoolean("oauth_auto_create_token", Boolean.FALSE)) {
-			return;
-		}
+//		IWMainApplicationSettings settings = getSettings();
+//		if (!settings.getBoolean("oauth_auto_create_token", Boolean.FALSE)) {
+//			throw new IllegalStateException("Token creation is not provided!");
+//		}
 
 		switch (credentials.getType()) {
 		case AUTHENTICATION_GATEWAY:
@@ -424,16 +454,16 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		default:
 			String username = credentials.getUserName();
 			if (!StringUtil.isEmpty(username) && getCache().get(username) != null) {
-				return;	//	Token already exists
+				throw new IllegalStateException(String.format("User '%s' already has token!", username));
 			}
 
 			String clientId = getDefaultClientId();
 			if (StringUtil.isEmpty(clientId)) {
-				return;
+				throw new IllegalStateException("Client id is not provided!");
 			}
 			String secret = getDefaultSecret();
 			if (StringUtil.isEmpty(secret)) {
-				return;
+				throw new IllegalStateException("Client secret is not provided!");
 			}
 
 			OAuthToken token = getToken(credentials.getServerURL(), clientId, secret, username, credentials.getPassword());
@@ -467,7 +497,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 	private OAuthToken createAccessToken(LoggedInUserCredentials credentials, String clientId) {
 		if (credentials == null || credentials.getLoginId() == null) {
-			return null;
+			throw new IllegalStateException("Credentials is not provided!");
 		}
 
 		try {
@@ -513,7 +543,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 			OAuth2Authentication authentication = new OAuth2Authentication(storedOAuth2Request, authResult);
 			OAuth2AccessToken accessToken = tokenServices.createAccessToken(authentication);
 			if (accessToken == null) {
-				return null;
+				throw new IllegalStateException("Failed to create access token!");
 			}
 
 			Map<String, OAuthToken> tokens = getCache().get(clientId);
@@ -551,13 +581,17 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 	@Override
 	public OAuthToken getToken(String clientId, String username) {
-		if (StringUtil.isEmpty(clientId) || StringUtil.isEmpty(username)) {
-			return null;
+		if (StringUtil.isEmpty(clientId)) {
+			throw new IllegalStateException("Client id is not provided!");
+		}
+
+		if (StringUtil.isEmpty(username)) {
+			throw new IllegalStateException("Username is not provided!");
 		}
 
 		Map<String, OAuthToken> tokensForUserNames = getCache().get(clientId);
 		if (MapUtil.isEmpty(tokensForUserNames)) {
-			return null;
+			throw new IllegalStateException("Not tokens provided in cache!");
 		}
 
 		return tokensForUserNames.get(username);
@@ -566,7 +600,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	@Override
 	public OAuthToken getToken(String clientId, LoggedInUserCredentials credentials) {
 		if (credentials == null) {
-			return null;
+			throw new IllegalStateException("Credentials not provided!");
 		}
 
 		return createAccessToken(credentials, clientId);
@@ -575,68 +609,63 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	@Override
 	public LoggedInUser getAuthenticatedUser(HttpServletRequest request, UserCredentials credentials) {
 		if (credentials == null) {
-			getLogger().warning("Credentials not provided");
-			return null;
+			throw new IllegalArgumentException("Credentials not provided");
 		}
 
-		try {
-			HttpSession session = request.getSession(true);
+		HttpSession session = request.getSession(true);
 
-			LoginBusinessBean loginBusinessBean = LoginBusinessBean.getLoginBusinessBean(request);
-			if (loginBusinessBean.isLoggedOn(request)) {
-				IWContext iwc = CoreUtil.getIWContext();
-				loginBusinessBean.logOutUser(iwc);
-			}
-
-			if (!loginBusinessBean.logInUser(request, credentials.getUsername(), credentials.getPassword())) {
-				return null;
-			}
-
-			com.idega.user.data.bean.User user = loginBusinessBean.getCurrentUser(session);
-			if (user == null) {
-				return null;
-			}
-
-			LoggedOnInfo info = loginBusinessBean.getLoggedOnInfo(session, credentials.getUsername());
-			if (info == null) {
-				return null;
-			}
-			UserLogin login = info.getUserLogin();
-			if (login == null) {
-				return null;
-			}
-			Integer loginId = login.getId();
-			if (loginId == null) {
-				return null;
-			}
-
-			LoggedInUserCredentials loggedInUserCredentials = new LoggedInUserCredentials(
-					request,
-					credentials.getUrl(),
-					credentials.getUsername(),
-					credentials.getPassword(),
-					null,
-					loginId,
-					null
-			);
-			OAuthToken token = getToken(credentials.getClientId(), loggedInUserCredentials);
-			if (token == null) {
-				String message = "Failed to get access token";
-				getLogger().warning(message);
-				return null;
-			}
-
-			LoggedInUser loggedInUser = new LoggedInUser();
-			loggedInUser.setName(user.getName());
-			loggedInUser.setPersonalID(user.getPersonalID());
-			loggedInUser.setLogin(login.getUserLogin());
-			loggedInUser.setToken(token);
-			return loggedInUser;
-		} catch (Exception e) {
-			getLogger().log(Level.WARNING, "Error while logging in " + credentials.getUsername(), e);
+		LoginBusinessBean loginBusinessBean = LoginBusinessBean.getLoginBusinessBean(request);
+		if (loginBusinessBean.isLoggedOn(request)) {
+			IWContext iwc = CoreUtil.getIWContext();
+			loginBusinessBean.logOutUser(iwc);
 		}
 
-		return null;
+		if (!loginBusinessBean.logInUser(request, credentials.getUsername(), credentials.getPassword())) {
+			throw new IllegalStateException(String.format("Failed to log in user: '%s'", credentials.getUsername()));
+		}
+
+		com.idega.user.data.bean.User user = loginBusinessBean.getCurrentUser(session);
+		if (user == null) {
+			throw new IllegalStateException(String.format("Failed user from session: '%s'", credentials.getUsername()));
+		}
+
+		LoggedOnInfo info = loginBusinessBean.getLoggedOnInfo(session, credentials.getUsername());
+		if (info == null) {
+			throw new IllegalStateException(String.format("Failed to get user from session: '%s'", credentials.getUsername()));
+		}
+
+		UserLogin login = info.getUserLogin();
+		if (login == null) {
+			throw new IllegalStateException(String.format("Failed to get user login: '%s'", credentials.getUsername()));
+		}
+
+		Integer loginId = login.getId();
+		if (loginId == null) {
+			throw new IllegalStateException(String.format("Failed to get user login id: '%s'", credentials.getUsername()));
+		}
+
+		LoggedInUserCredentials loggedInUserCredentials = new LoggedInUserCredentials(
+				request,
+				credentials.getUrl(),
+				credentials.getUsername(),
+				null,
+				loginId,
+				null
+		);
+
+		loggedInUserCredentials.setPassword(credentials.getPassword());
+		
+		OAuthToken token = getToken(credentials.getClientId(), loggedInUserCredentials);
+		if (token == null) {
+			throw new IllegalStateException(String.format("Failed to get access token for user: '%s'", credentials.getUsername()));
+		}
+
+		LoggedInUser loggedInUser = new LoggedInUser();
+		loggedInUser.setName(user.getName());
+		loggedInUser.setPersonalID(user.getPersonalID());
+		loggedInUser.setLogin(login.getUserLogin());
+		loggedInUser.setToken(token);
+		return loggedInUser;
 	}
 
 	private OAuth2AccessToken getRefreshedToken(OAuth2AccessToken expiredAccessToken, String clientId) throws Exception {
@@ -646,8 +675,7 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 		OAuth2RefreshToken refreshToken = expiredAccessToken.getRefreshToken();
 		if (refreshToken == null || StringUtil.isEmpty(refreshToken.getValue())) {
-			getLogger().warning("Invalid refresh token " + refreshToken + " for access token: " + expiredAccessToken);
-			return null;
+			throw new IllegalStateException("Invalid refresh token");
 		}
 
 		Map<String, String> parameters = new HashMap<>();
@@ -672,16 +700,15 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		try {
 			OAuth2AccessToken accessToken = tokenServices.readAccessToken(token);
 			if (accessToken == null) {
-				getLogger().warning("Invalid token: " + token);
-				return null;
+				throw new IllegalStateException(String.format("Failed to log in user by token: '%s'", token));
 			}
 
 			if (accessToken.isExpired()) {
 				triedToRefresh = true;
+
 				OAuth2AccessToken refreshedAccessToken = getRefreshedToken(accessToken, clientId);
 				if (refreshedAccessToken == null) {
-					getLogger().warning("Unable to refresh expired access token: " + accessToken + ", token: " + token);
-					return null;
+					throw new IllegalStateException("No refresh token found!");
 				}
 
 				token = refreshedAccessToken.getValue();
