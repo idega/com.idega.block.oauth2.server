@@ -21,6 +21,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import com.idega.block.login.data.dao.PasswordTokenEntityDAO;
+import com.idega.block.oauth2.server.business.impl.AuthenticationListener;
 import com.idega.block.user.bean.UserCredentials;
 import com.idega.block.user.data.dao.UserCredentialsDAO;
 import com.idega.core.accesscontrol.business.LoginBusinessBean;
@@ -94,6 +95,13 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		}
 
 		Authentication authentication = securityContext.getAuthentication();
+		if (authentication == null) {
+			AuthenticationListener listener = ELUtil.getInstance().getBean(AuthenticationListener.BEAN_NAME);
+			if (listener != null) {
+				authentication = listener.getAuthentication();
+			}
+		}
+
 		return getAuthenticatedUser(authentication);
 	}
 
