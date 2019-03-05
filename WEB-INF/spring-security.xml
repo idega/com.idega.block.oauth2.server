@@ -148,9 +148,6 @@
 			name="supportRefreshToken"
 			value="true" />
 		<property
-			name="accessTokenValiditySeconds"
-			value="86400" />
-		<property
 			name="clientDetailsService"
 			ref="clientDetails" />
 		<property
@@ -274,7 +271,7 @@
 	<!-- This is where we tells spring security what URL should be protected and which roles have access to them -->
 	<security:http
 		pattern="/api/**"
-		create-session="never"
+		create-session="always"
 		entry-point-ref="oauthAuthenticationEntryPoint"
 		access-decision-manager-ref="accessDecisionManager"
 		xmlns="http://www.springframework.org/schema/security">
@@ -289,7 +286,7 @@
 	</security:http>
     <security:http
 		pattern="/rest/**"
-		create-session="never"
+		create-session="always"
 		entry-point-ref="oauthAuthenticationEntryPoint"
 		access-decision-manager-ref="accessDecisionManager"
 		xmlns="http://www.springframework.org/schema/security">
@@ -304,7 +301,7 @@
 	</security:http>
 	<security:http
 		pattern="/central/**"
-		create-session="never"
+		create-session="always"
 		entry-point-ref="oauthAuthenticationEntryPoint"
 		access-decision-manager-ref="accessDecisionManager"
 		xmlns="http://www.springframework.org/schema/security">
@@ -319,7 +316,7 @@
 	</security:http>
 	<security:http
 		pattern="/parents/**"
-		create-session="never"
+		create-session="always"
 		entry-point-ref="oauthAuthenticationEntryPoint"
 		access-decision-manager-ref="accessDecisionManager"
 		xmlns="http://www.springframework.org/schema/security">
@@ -334,7 +331,7 @@
 	</security:http>
 	<security:http
 		pattern="/trainer/**"
-		create-session="never"
+		create-session="always"
 		entry-point-ref="oauthAuthenticationEntryPoint"
 		access-decision-manager-ref="accessDecisionManager"
 		xmlns="http://www.springframework.org/schema/security">
@@ -349,7 +346,7 @@
 	</security:http>
 	<security:http
 		pattern="/club/**"
-		create-session="never"
+		create-session="always"
 		entry-point-ref="oauthAuthenticationEntryPoint"
 		access-decision-manager-ref="accessDecisionManager"
 		xmlns="http://www.springframework.org/schema/security">
@@ -364,7 +361,7 @@
 	</security:http>
 	<security:http
 		pattern="/token/**"
-		create-session="never"
+		create-session="always"
 		entry-point-ref="oauthAuthenticationEntryPoint"
 		access-decision-manager-ref="accessDecisionManager">
 		<security:anonymous enabled="false" />
@@ -399,7 +396,8 @@
 				users-by-username-query="SELECT icl.user_login as username, icl.usr_password as password, CASE WHEN icli.account_enabled = 'Y' THEN 1 ELSE 0 END as enabled FROM ic_login icl, ic_login_info icli where icli.ic_login_id = icl.ic_login_id and icl.user_login = ?"
 			/>
 		</security:authentication-provider>
-		<security:authentication-provider ref = "internalAuthenticationProvider">
+		<security:authentication-provider
+			ref="internalAuthenticationProvider">
 		</security:authentication-provider>
 	</security:authentication-manager>
 
