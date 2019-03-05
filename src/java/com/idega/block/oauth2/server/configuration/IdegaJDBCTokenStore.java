@@ -133,4 +133,11 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 			}
 		} while (!saved);
 	}
+
+	@Override
+	public OAuth2AccessToken readAccessToken(String tokenValue) {
+		String extractedValue = extractTokenKey(tokenValue);
+		
+		return super.readAccessToken(tokenValue);
+	}
 }
