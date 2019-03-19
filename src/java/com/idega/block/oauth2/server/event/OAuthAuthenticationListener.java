@@ -1,5 +1,5 @@
 /**
- * @(#)IdegaJDBCTokenStore.java    1.0.0 16:30:15
+ * @(#)AuthenticationErrorListener.java    1.0.0 6:42:01 PM
  *
  * Idega Software hf. Source Code Licence Agreement x
  *
@@ -80,60 +80,124 @@
  *     License that was purchased to become eligible to receive the Source
  *     Code after Licensee receives the source code.
  */
-package com.idega.block.oauth2.server.configuration;
+package com.idega.block.oauth2.server.event;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
-import javax.sql.DataSource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.annotation.Scope;
+import org.springframework.security.authentication.event.AbstractAuthenticationFailureEvent;
+import org.springframework.security.authentication.event.AuthenticationSuccessEvent;
+import org.springframework.security.authentication.event.InteractiveAuthenticationSuccessEvent;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Service;
+
+import com.idega.core.accesscontrol.bean.UserHasLoggedOutEvent;
+import com.idega.core.business.DefaultSpringBean;
+import com.idega.event.HttpSessionDestroyed;
+import com.idega.presentation.IWContext;
+import com.idega.servlet.filter.RequestResponseProvider;
+import com.idega.util.CoreUtil;
+import com.idega.util.StringUtil;
+import com.idega.util.expression.ELUtil;
 
 /**
- * <p>Workaround for https://github.com/spring-projects/spring-security-oauth/issues/754</p>
- * @version 1.0.0 2016-12-19
+ * <p>TODO</p>
+ *
+ * @version 1.0.0 Feb 27, 2019
  * @author <a href="mailto:martynas@idega.is">Martynas Stakė</a>
  */
-public class IdegaJDBCTokenStore extends JdbcTokenStore {
+@Service
+@Scope(BeanDefinition.SCOPE_SINGLETON)
+public class OAuthAuthenticationListener extends DefaultSpringBean implements ApplicationListener<ApplicationEvent> {
 
-	private static final Logger LOGGER = Logger.getLogger(IdegaJDBCTokenStore.class.getName());
+	private boolean evaluated = Boolean.FALSE;
 
-	public static final String ACCESS_TOKEN_INSERT_STATEMENT = "replace into oauth_access_token (token_id, token, authentication_id, user_name, client_id, authentication, refresh_token) values (?, ?, ?, ?, ?, ?, ?)";
-	public static final String REFRESH_TOKEN_INSERT_STATEMENT = "replace into oauth_refresh_token (token_id, token, authentication) values (?, ?, ?)";
+	private Map<String, Authentication> authentications = new HashMap<>();
 
-	public IdegaJDBCTokenStore(DataSource dataSource) {
-		super(dataSource);
-		setInsertAccessTokenSql(ACCESS_TOKEN_INSERT_STATEMENT);
-		setInsertRefreshTokenSql(REFRESH_TOKEN_INSERT_STATEMENT);
+	public Authentication getAuthentication() {
+		String id = getId();
+		if (StringUtil.isEmpty(id)) {
+			return null;
+		}
+
+		return authentications.get(id);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.springframework.security.oauth2.provider.token.store.JdbcTokenStore#storeAccessToken(org.springframework.security.oauth2.common.OAuth2AccessToken, org.springframework.security.oauth2.provider.OAuth2Authentication)
-	 */
-	@Override
-	public void storeAccessToken(OAuth2AccessToken token, OAuth2Authentication authentication) {
-		boolean saved = Boolean.FALSE;
-		do {
-			try {
-				super.storeAccessToken(token, authentication);
-				saved = Boolean.TRUE;
-			} catch (DuplicateKeyException e) {
-				LOGGER.log(
-						Level.WARNING,
-						"Failed to store access token (" + token.getValue() + ", refresh token: " + token.getRefreshToken().getValue() +
-						") due to duplicated key error, trying one more time. Authentication: " + authentication,
-						e
-				);
+	public boolean isEvaluated() {
+		return evaluated;
+	}
 
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e1) {}
+	private String getId() {
+		try {
+			RequestResponseProvider rrProvider = null;
+			try {
+				rrProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
+			} catch (Exception e) {}
+			HttpServletRequest request = rrProvider == null ? null : rrProvider.getRequest();
+			if (request == null) {
+				IWContext iwc = CoreUtil.getIWContext();
+				if (iwc != null) {
+					request = iwc.getRequest();
+				}
 			}
-		} while (!saved);
+
+			HttpSession session = null;
+			if (request != null) {
+				session = request.getSession(false);
+			}
+
+			return session == null ? null : session.getId();
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error getting HTTP session ID for authentication to store", e);
+		}
+		return null;
+	}
+
+	@Override
+	public void onApplicationEvent(ApplicationEvent event) {
+		Authentication authentication = null;
+
+		if (event instanceof AbstractAuthenticationFailureEvent) {
+			Exception e = ((AbstractAuthenticationFailureEvent) event).getException();
+			String message = "Authentication to security context failed: " + e.getMessage();
+			getLogger().log(Level.WARNING, message, e);
+			CoreUtil.sendExceptionNotification(message, e);
+
+		} else if (event instanceof AuthenticationSuccessEvent) {
+			authentication = ((AuthenticationSuccessEvent) event).getAuthentication();
+
+		} else if (event instanceof InteractiveAuthenticationSuccessEvent) {
+			authentication = ((InteractiveAuthenticationSuccessEvent) event).getAuthentication();
+
+		} else if (event instanceof UserHasLoggedOutEvent) {
+			String id = getId();
+			if (id != null) {
+				authentications.remove(id);
+			}
+
+		} else if (event instanceof HttpSessionDestroyed) {
+			String id = ((HttpSessionDestroyed) event).getHttpSessionId();
+			if (id != null) {
+				authentications.remove(id);
+			}
+		}
+
+		if (authentication != null) {
+			String id = getId();
+			if (id != null) {
+				authentications.put(id, authentication);
+			}
+		}
+
+		this.evaluated = Boolean.TRUE;
 	}
 
 }

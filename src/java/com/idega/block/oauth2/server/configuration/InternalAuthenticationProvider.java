@@ -21,12 +21,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import com.idega.block.login.data.dao.PasswordTokenEntityDAO;
+import com.idega.block.oauth2.server.event.OAuthAuthenticationListener;
 import com.idega.block.user.bean.UserCredentials;
 import com.idega.block.user.data.dao.UserCredentialsDAO;
 import com.idega.core.accesscontrol.business.LoginBusinessBean;
 import com.idega.core.accesscontrol.business.LoginDBHandler;
+import com.idega.core.accesscontrol.dao.UserLoginDAO;
 import com.idega.core.accesscontrol.data.LoginTable;
 import com.idega.core.accesscontrol.data.LoginTableHome;
+import com.idega.core.accesscontrol.data.bean.UserLogin;
 import com.idega.data.IDOLookup;
 import com.idega.data.IDOLookupException;
 import com.idega.presentation.IWContext;
@@ -51,6 +54,26 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 
 	@Autowired(required = false)
 	private UserCredentialsDAO userCredentialsDAO = null;
+
+	@Autowired
+	private OAuthAuthenticationListener oAuthAuthenticationListener;
+
+	@Autowired
+	private UserLoginDAO userLoginDAO;
+
+	private OAuthAuthenticationListener getOAuthAuthenticationListener() {
+		if (oAuthAuthenticationListener == null) {
+			ELUtil.getInstance().autowire(this);
+		}
+		return oAuthAuthenticationListener;
+	}
+
+	private UserLoginDAO getUserLoginDAO() {
+		if (userLoginDAO == null) {
+			ELUtil.getInstance().autowire(this);
+		}
+		return userLoginDAO;
+	}
 
 	private UserCredentialsDAO getUserCredentialsDAO() {
 		if (this.userCredentialsDAO == null) {
@@ -88,16 +111,27 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 	}
 
 	public com.idega.user.data.bean.User getAuthenticatedUser() {
-		SecurityContext securityContext = SecurityContextHolder.getContext();
-		if (securityContext == null) {
-			throw new IllegalStateException("Failed to get " + SecurityContext.class);
+		Authentication authentication = null;
+
+		SecurityContext securityContext = null;
+		try {
+			securityContext = SecurityContextHolder.getContext();
+		} catch (Exception e) {}
+		if (securityContext != null) {
+			authentication = securityContext.getAuthentication();
 		}
 
-		Authentication authentication = securityContext.getAuthentication();
+		if (authentication == null) {
+			OAuthAuthenticationListener listener = getOAuthAuthenticationListener();
+			if (listener != null) {
+				authentication = listener.getAuthentication();
+			}
+		}
+
 		return getAuthenticatedUser(authentication);
 	}
 
-	private com.idega.user.data.bean.User getAuthenticatedUser(Authentication authentication) {
+	private synchronized com.idega.user.data.bean.User getAuthenticatedUser(Authentication authentication) {
 		if (authentication == null) {
 			throw new IllegalStateException("Failed to get authentication info from security context");
 		}
@@ -174,20 +208,24 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		}
 
 		try {
+			LoginBusinessBean loginBusinessBean = LoginBusinessBean.getLoginBusinessBean(iwc);
+
 			if (iwc.isLoggedOn()) {
 				com.idega.user.data.bean.User loggedInUser = iwc.getLoggedInUser();
 				if (loggedInUser != null && loggedInUser.getId().intValue() == user.getId().intValue()) {
 					return user;
 				}
 
-				if (LoginBusinessBean.getLoginBusinessBean(iwc.getRequest()).logInAsAnotherUser(iwc, user)) {
+				if (loginBusinessBean.logInAsAnotherUser(iwc, user)) {
 					return user;
 				}
 			} else {
 				HttpServletRequest request = iwc.getRequest();
-				if (LoginBusinessBean.getLoginBusinessBean(request).logInUser(request, user)) {
-					return user;
-				}
+				UserLogin userLogin = getUserLoginDAO().find(UserLogin.class, (Integer) loginTable.getPrimaryKey());
+				loginBusinessBean.setUserLoggedIn(request, user, userLogin);
+				String type = request.getParameter("type");
+				loginBusinessBean.doPublishLoggedInEvent(request, user, userLogin.getUserLogin(), StringUtil.isEmpty(type) ? userLogin.getLoginType() : type);
+				return user;
 			}
 		} catch (Exception e) {
 			throw new IllegalStateException("Unable to login in user " + user);
