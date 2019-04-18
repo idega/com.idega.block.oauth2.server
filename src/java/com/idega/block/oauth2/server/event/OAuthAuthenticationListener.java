@@ -167,7 +167,7 @@ public class OAuthAuthenticationListener extends DefaultSpringBean implements Ap
 
 		if (event instanceof AbstractAuthenticationFailureEvent) {
 			Exception e = ((AbstractAuthenticationFailureEvent) event).getException();
-			String message = "Authentication to security context failed: " + e.getMessage();
+			String message = "Authentication to security context failed, event: " + event + ", exc. message: " + e.getMessage();
 			getLogger().log(Level.WARNING, message, e);
 			CoreUtil.sendExceptionNotification(message, e);
 
