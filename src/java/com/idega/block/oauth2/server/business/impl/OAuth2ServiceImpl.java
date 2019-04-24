@@ -498,6 +498,10 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 	private OAuthToken createAccessToken(Authentication authResult, HttpServletRequest request, String clientId, String username) {
 		try {
+			if (StringUtil.isEmpty(clientId) ||StringUtil.isEmpty(username)) {
+				return null;
+			}
+
 			Map<String, String> map = getSingleValueMap(request);
 			map.put(OAuth2Utils.CLIENT_ID, clientId);
 			AuthorizationRequest authorizationRequest = oAuth2RequestFactory.createAuthorizationRequest(map);
