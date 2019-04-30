@@ -82,6 +82,7 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -89,8 +90,14 @@ import javax.sql.DataSource;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.common.OAuth2RefreshToken;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
+
+import com.idega.core.cache.IWCacheManager2;
+import com.idega.idegaweb.IWMainApplication;
+import com.idega.util.CoreConstants;
+import com.idega.util.StringUtil;
 
 /**
  * <p>Workaround for https://github.com/spring-projects/spring-security-oauth/issues/754</p>
@@ -110,10 +117,126 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 		setInsertRefreshTokenSql(REFRESH_TOKEN_INSERT_STATEMENT);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.springframework.security.oauth2.provider.token.store.JdbcTokenStore#storeAccessToken(org.springframework.security.oauth2.common.OAuth2AccessToken, org.springframework.security.oauth2.provider.OAuth2Authentication)
-	 */
+	private <T> Map<String, T> getCache(String type) {
+		Map<String, T> cache = IWCacheManager2.getInstance(IWMainApplication.getDefaultIWMainApplication()).getCache("idega_oauth_".concat(type).concat("_cache"), 1800);
+		return cache;
+	}
+
+	private Map<String, OAuth2AccessToken> getAccessTokenCache() {
+		return getCache("access_tokens");
+	}
+
+	private Map<String, OAuth2RefreshToken> getRefreshTokenCache() {
+		return getCache("refresh_tokens");
+	}
+
+	private Map<String, OAuth2Authentication> getAuthenticationCache(boolean refresh) {
+		return getCache("authentication_tokens".concat(refresh ? "_for_refresh" : CoreConstants.EMPTY));
+	}
+
+	@Override
+	public OAuth2AccessToken readAccessToken(String tokenValue) {
+		if (StringUtil.isEmpty(tokenValue)) {
+			return null;
+		}
+
+		Map<String, OAuth2AccessToken> cache = getAccessTokenCache();
+		OAuth2AccessToken cached = cache == null ? null : cache.get(tokenValue);
+		if (cached != null) {
+			return cached;
+		}
+
+		OAuth2AccessToken accessToken = super.readAccessToken(tokenValue);
+		if (accessToken != null && cache != null) {
+			cache.put(tokenValue, accessToken);
+		}
+
+		return accessToken;
+	}
+
+	@Override
+	public OAuth2RefreshToken readRefreshToken(String token) {
+		if (StringUtil.isEmpty(token)) {
+			return null;
+		}
+
+		Map<String, OAuth2RefreshToken> cache = getRefreshTokenCache();
+		OAuth2RefreshToken cached = cache == null ? null : cache.get(token);
+		if (cached != null) {
+			return cached;
+		}
+
+		OAuth2RefreshToken refreshToken = super.readRefreshToken(token);
+		if (refreshToken != null && cache != null) {
+			cache.put(token, refreshToken);
+		}
+
+		return refreshToken;
+	}
+
+	@Override
+	public OAuth2Authentication readAuthentication(String token) {
+		if (StringUtil.isEmpty(token)) {
+			return null;
+		}
+
+		Map<String, OAuth2Authentication> cache = getAuthenticationCache(false);
+		OAuth2Authentication cached = cache == null ? null : cache.get(token);
+		if (cached != null) {
+			return cached;
+		}
+
+		OAuth2Authentication authentication = super.readAuthentication(token);
+		if (authentication != null && cache != null) {
+			cache.put(token, authentication);
+		}
+
+		return authentication;
+	}
+
+	@Override
+	public OAuth2Authentication readAuthenticationForRefreshToken(String value) {
+		if (StringUtil.isEmpty(value)) {
+			return null;
+		}
+
+		Map<String, OAuth2Authentication> cache = getAuthenticationCache(true);
+		OAuth2Authentication cached = cache == null ? null : cache.get(value);
+		if (cached != null) {
+			return cached;
+		}
+
+		OAuth2Authentication authentication = super.readAuthenticationForRefreshToken(value);
+		if (authentication != null && cache != null) {
+			cache.put(value, authentication);
+		}
+
+		return authentication;
+	}
+
+	private void updateRefreshCaches(String tokenId, OAuth2RefreshToken refreshToken, OAuth2Authentication authentication) {
+		if (refreshToken == null) {
+			return;
+		}
+
+		String refreshTokenId = refreshToken.getValue();
+
+		Map<String, OAuth2RefreshToken> refreshTokens = getRefreshTokenCache();
+		if (refreshTokens != null) {
+			if (!StringUtil.isEmpty(tokenId)) {
+				refreshTokens.put(tokenId, refreshToken);
+			}
+			refreshTokens.put(refreshTokenId, refreshToken);
+		}
+
+		if (authentication != null) {
+			Map<String, OAuth2Authentication> authenticationsForRefresh = getAuthenticationCache(true);
+			if (authenticationsForRefresh != null) {
+				authenticationsForRefresh.put(refreshTokenId, authentication);
+			}
+		}
+	}
+
 	@Override
 	public void storeAccessToken(OAuth2AccessToken token, OAuth2Authentication authentication) {
 		boolean saved = Boolean.FALSE;
@@ -121,17 +244,51 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 			try {
 				super.storeAccessToken(token, authentication);
 				saved = Boolean.TRUE;
+
+				String tokenId = token.getValue();
+
+				Map<String, OAuth2AccessToken> accessTokens = getAccessTokenCache();
+				if (accessTokens != null) {
+					accessTokens.put(tokenId, token);
+				}
+
+				Map<String, OAuth2Authentication> authentications = getAuthenticationCache(false);
+				if (authentications != null) {
+					authentications.put(tokenId, authentication);
+				}
+
+				OAuth2RefreshToken refreshToken = token.getRefreshToken();
+				updateRefreshCaches(tokenId, refreshToken, authentication);
 			} catch (DuplicateKeyException e) {
 				LOGGER.log(
 						Level.WARNING,
-						"Failed to store access token (" + token.getValue() + ", refresh token: " + token.getRefreshToken().getValue() +
+						"Failed to store access token (" + token.getValue() + ", refresh token: " + (token.getRefreshToken() == null ? "unknown" : token.getRefreshToken().getValue()) +
 						") due to duplicated key error, trying one more time. Authentication: " + authentication,
 						e
 				);
 
 				try {
 					Thread.sleep(1000);
-				} catch (InterruptedException e1) {}
+				} catch (InterruptedException ie) {}
+			}
+		} while (!saved);
+	}
+
+	@Override
+	public void storeRefreshToken(OAuth2RefreshToken refreshToken, OAuth2Authentication authentication) {
+		boolean saved = Boolean.FALSE;
+		do {
+			try {
+				super.storeRefreshToken(refreshToken, authentication);
+				saved = Boolean.TRUE;
+
+				updateRefreshCaches(null, refreshToken, authentication);
+			} catch (Exception e) {
+				LOGGER.log(Level.WARNING, "Failed to store refresh token (" + refreshToken.getValue() + "), trying one more time. Authentication: " + authentication, e);
+
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException ie) {}
 			}
 		} while (!saved);
 	}
