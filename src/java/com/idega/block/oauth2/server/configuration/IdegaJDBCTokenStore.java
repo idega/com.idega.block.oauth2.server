@@ -118,7 +118,13 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 	}
 
 	private <T> Map<String, T> getCache(String type) {
-		Map<String, T> cache = IWCacheManager2.getInstance(IWMainApplication.getDefaultIWMainApplication()).getCache("idega_oauth_".concat(type).concat("_cache"), 1800);
+		Map<String, T> cache = IWCacheManager2.getInstance(IWMainApplication.getDefaultIWMainApplication()).getCache(
+				"idega_oauth_".concat(type).concat("_cache"),
+				100000,
+				IWCacheManager2.DEFAULT_OVERFLOW_TO_DISK,
+				IWCacheManager2.DEFAULT_ETERNAL,
+				86400
+		);
 		return cache;
 	}
 
