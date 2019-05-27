@@ -110,7 +110,7 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		return loginTableHome;
 	}
 
-	public com.idega.user.data.bean.User getAuthenticatedUser() {
+	public com.idega.user.data.bean.User getAuthenticatedUser(IWContext iwc) {
 		Authentication authentication = null;
 
 		SecurityContext securityContext = null;
@@ -124,14 +124,14 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		if (authentication == null) {
 			OAuthAuthenticationListener listener = getOAuthAuthenticationListener();
 			if (listener != null) {
-				authentication = listener.getAuthentication();
+				authentication = listener.getAuthentication(iwc.getSession());
 			}
 		}
 
-		return getAuthenticatedUser(authentication);
+		return getAuthenticatedUser(authentication, iwc);
 	}
 
-	private synchronized com.idega.user.data.bean.User getAuthenticatedUser(Authentication authentication) {
+	private synchronized com.idega.user.data.bean.User getAuthenticatedUser(Authentication authentication, IWContext iwc) {
 		if (authentication == null) {
 			throw new IllegalStateException("Failed to get authentication info from security context");
 		}
@@ -195,7 +195,6 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 			throw new IllegalStateException("User by login name " + login + " was not found");
 		}
 
-		IWContext iwc = CoreUtil.getIWContext();
 		if (iwc == null) {
 			RequestResponseProvider requestProvider = null;
 			try {
@@ -278,7 +277,7 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 			return getAuthentication(providedLogin);
 		}
 
-		User user = getAuthenticatedUser(authentication);
+		User user = getAuthenticatedUser(authentication, null);
 		if (user == null) {
 			return null;
 		}

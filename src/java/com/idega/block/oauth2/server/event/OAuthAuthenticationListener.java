@@ -102,7 +102,6 @@ import org.springframework.stereotype.Service;
 import com.idega.core.accesscontrol.bean.UserHasLoggedOutEvent;
 import com.idega.core.business.DefaultSpringBean;
 import com.idega.event.HttpSessionDestroyed;
-import com.idega.presentation.IWContext;
 import com.idega.servlet.filter.RequestResponseProvider;
 import com.idega.util.CoreUtil;
 import com.idega.util.StringUtil;
@@ -122,8 +121,8 @@ public class OAuthAuthenticationListener extends DefaultSpringBean implements Ap
 
 	private Map<String, Authentication> authentications = new HashMap<>();
 
-	public Authentication getAuthentication() {
-		String id = getId();
+	public Authentication getAuthentication(HttpSession session) {
+		String id = getId(session);
 		if (StringUtil.isEmpty(id)) {
 			return null;
 		}
@@ -136,24 +135,20 @@ public class OAuthAuthenticationListener extends DefaultSpringBean implements Ap
 	}
 
 	private String getId() {
+		RequestResponseProvider rrProvider = null;
 		try {
-			RequestResponseProvider rrProvider = null;
-			try {
-				rrProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
-			} catch (Exception e) {}
-			HttpServletRequest request = rrProvider == null ? null : rrProvider.getRequest();
-			if (request == null) {
-				IWContext iwc = CoreUtil.getIWContext();
-				if (iwc != null) {
-					request = iwc.getRequest();
-				}
-			}
+			rrProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
+		} catch (Exception e) {}
+		if (rrProvider == null) {
+			return null;
+		}
 
-			HttpSession session = null;
-			if (request != null) {
-				session = request.getSession(false);
-			}
+		HttpServletRequest request = rrProvider.getRequest();
+		return request == null ? null : getId(request.getSession());
+	}
 
+	private String getId(HttpSession session) {
+		try {
 			return session == null ? null : session.getId();
 		} catch (Exception e) {
 			getLogger().log(Level.WARNING, "Error getting HTTP session ID for authentication to store", e);

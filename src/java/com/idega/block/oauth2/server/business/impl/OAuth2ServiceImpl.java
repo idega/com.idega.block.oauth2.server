@@ -144,7 +144,6 @@ import com.idega.data.IDOLookup;
 import com.idega.idegaweb.IWMainApplicationSettings;
 import com.idega.presentation.IWContext;
 import com.idega.util.CoreConstants;
-import com.idega.util.CoreUtil;
 import com.idega.util.ListUtil;
 import com.idega.util.StringHandler;
 import com.idega.util.StringUtil;
@@ -214,17 +213,17 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	 * @see com.idega.core.business.OAuth2Service#getAuthenticatedUser()
 	 */
 	@Override
-	public com.idega.user.data.bean.User getAuthenticatedUser() {
+	public com.idega.user.data.bean.User getAuthenticatedUser(IWContext iwc) {
 		if (authenticationProvider == null) {
 			getLogger().warning("Bean with type " + InternalAuthenticationProvider.class.getName() + " is not available");
 			return null;
 		}
 
-		return authenticationProvider.getAuthenticatedUser();
+		return authenticationProvider.getAuthenticatedUser(iwc);
 	}
 
 	@Override
-	public boolean logoutUser() {
+	public boolean logoutUser(IWContext iwc) {
 		SecurityContext securityContext = SecurityContextHolder.getContext();
 		if (securityContext == null) {
 			return true;	//	User is not logged in
@@ -252,8 +251,6 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		} else {
 			return true;
 		}
-
-		IWContext iwc = CoreUtil.getIWContext();
 
 		String tokenValue = authentication.getOAuth2Request().getRequestParameters().get("access_token");
 		if (StringUtil.isEmpty(tokenValue) && iwc != null) {
@@ -577,21 +574,21 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 	}
 
 	@Override
-	public LoggedInUser getAuthenticatedUser(HttpServletRequest request, UserCredentials credentials) {
+	public LoggedInUser getAuthenticatedUser(IWContext iwc, UserCredentials credentials) {
 		if (credentials == null) {
 			getLogger().warning("Credentials not provided");
 			return null;
 		}
 
 		try {
-			HttpSession session = request.getSession(true);
+			HttpSession session = iwc.getSession();
 
-			LoginBusinessBean loginBusinessBean = LoginBusinessBean.getLoginBusinessBean(request);
-			if (loginBusinessBean.isLoggedOn(request)) {
-				IWContext iwc = CoreUtil.getIWContext();
+			LoginBusinessBean loginBusinessBean = LoginBusinessBean.getLoginBusinessBean(iwc);
+			if (loginBusinessBean.isLoggedOn(session)) {
 				loginBusinessBean.logOutUser(iwc);
 			}
 
+			HttpServletRequest request = iwc.getRequest();
 			if (!loginBusinessBean.logInUser(request, credentials.getUsername(), credentials.getPassword())) {
 				return null;
 			}

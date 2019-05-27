@@ -1,6 +1,8 @@
 package com.idega.block.oauth2.server.authentication.business.impl;
 
+import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -18,6 +20,7 @@ import com.idega.block.oauth2.server.authentication.bean.AuthorizationCredential
 import com.idega.block.oauth2.server.authentication.bean.User;
 import com.idega.block.oauth2.server.authentication.business.AdditionalDataDAO;
 import com.idega.block.oauth2.server.authentication.business.Authenticator;
+import com.idega.presentation.IWContext;
 import com.idega.restful.business.DefaultRestfulService;
 import com.idega.util.expression.ELUtil;
 
@@ -53,10 +56,14 @@ public class AuthenticatorImpl extends DefaultRestfulService implements
 	@Override
 	@POST
 	@Path(Authenticator.USER)
-	public Response getAuthenticatedUser(AuthorizationCredentials credentials,
-			@Context HttpServletRequest request) {
-		LoggedInUser loggedInUserData = getOAuth2Service()
-				.getAuthenticatedUser(request, credentials);
+	public Response getAuthenticatedUser(
+			AuthorizationCredentials credentials,
+			@Context HttpServletRequest request,
+			@Context HttpServletResponse response,
+			@Context ServletContext context
+	) {
+		IWContext iwc = new IWContext(request, response, context);
+		LoggedInUser loggedInUserData = getOAuth2Service().getAuthenticatedUser(iwc, credentials);
 		if (loggedInUserData == null) {
 			return getBadRequestResponse(Boolean.FALSE);
 		}
