@@ -82,6 +82,7 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -94,9 +95,6 @@ import org.springframework.security.oauth2.common.OAuth2RefreshToken;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
 
-import com.idega.core.cache.IWCacheManager2;
-import com.idega.idegaweb.IWMainApplication;
-import com.idega.util.CoreConstants;
 import com.idega.util.StringUtil;
 
 /**
@@ -111,35 +109,27 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 	public static final String ACCESS_TOKEN_INSERT_STATEMENT = "replace into oauth_access_token (token_id, token, authentication_id, user_name, client_id, authentication, refresh_token) values (?, ?, ?, ?, ?, ?, ?)";
 	public static final String REFRESH_TOKEN_INSERT_STATEMENT = "replace into oauth_refresh_token (token_id, token, authentication) values (?, ?, ?)";
 
+	private Map<String, OAuth2AccessToken> accessTokenCache = new HashMap<>();
+	private Map<String, OAuth2RefreshToken> refreshTokenCache = new HashMap<>();
+	private Map<String, OAuth2Authentication> authenticationCache = new HashMap<>();
+	private Map<String, OAuth2Authentication> authenticationCacheForRefresh = new HashMap<>();
+
 	public IdegaJDBCTokenStore(DataSource dataSource) {
 		super(dataSource);
 		setInsertAccessTokenSql(ACCESS_TOKEN_INSERT_STATEMENT);
 		setInsertRefreshTokenSql(REFRESH_TOKEN_INSERT_STATEMENT);
 	}
 
-	private <T> Map<String, T> getCache(String type) {
-		Map<String, T> cache = IWCacheManager2.getInstance(IWMainApplication.getDefaultIWMainApplication()).getCache(
-				"idega_oauth2_".concat(type).concat("_cache"),
-				100000,
-				IWCacheManager2.DEFAULT_OVERFLOW_TO_DISK,
-				IWCacheManager2.DEFAULT_ETERNAL,
-				86400,
-				86400,
-				false
-		);
-		return cache;
-	}
-
 	private Map<String, OAuth2AccessToken> getAccessTokenCache() {
-		return getCache("access_tokens");
+		return accessTokenCache;
 	}
 
 	private Map<String, OAuth2RefreshToken> getRefreshTokenCache() {
-		return getCache("refresh_tokens");
+		return refreshTokenCache;
 	}
 
 	private Map<String, OAuth2Authentication> getAuthenticationCache(boolean refresh) {
-		return getCache("authentication_tokens".concat(refresh ? "_for_refresh" : CoreConstants.EMPTY));
+		return refresh ? authenticationCacheForRefresh : authenticationCache;
 	}
 
 	@Override
@@ -234,10 +224,12 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 			if (!StringUtil.isEmpty(tokenId)) {
 				refreshTokens.put(tokenId, refreshToken);
 			}
-			refreshTokens.put(refreshTokenId, refreshToken);
+			if (!StringUtil.isEmpty(refreshTokenId)) {
+				refreshTokens.put(refreshTokenId, refreshToken);
+			}
 		}
 
-		if (authentication != null) {
+		if (!StringUtil.isEmpty(refreshTokenId) && authentication != null) {
 			Map<String, OAuth2Authentication> authenticationsForRefresh = getAuthenticationCache(true);
 			if (authenticationsForRefresh != null) {
 				authenticationsForRefresh.put(refreshTokenId, authentication);
@@ -254,15 +246,16 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 				saved = Boolean.TRUE;
 
 				String tokenId = token.getValue();
+				if (!StringUtil.isEmpty(tokenId)) {
+					Map<String, OAuth2AccessToken> accessTokens = getAccessTokenCache();
+					if (accessTokens != null) {
+						accessTokens.put(tokenId, token);
+					}
 
-				Map<String, OAuth2AccessToken> accessTokens = getAccessTokenCache();
-				if (accessTokens != null) {
-					accessTokens.put(tokenId, token);
-				}
-
-				Map<String, OAuth2Authentication> authentications = getAuthenticationCache(false);
-				if (authentications != null) {
-					authentications.put(tokenId, authentication);
+					Map<String, OAuth2Authentication> authentications = getAuthenticationCache(false);
+					if (authentications != null) {
+						authentications.put(tokenId, authentication);
+					}
 				}
 
 				OAuth2RefreshToken refreshToken = token.getRefreshToken();
@@ -299,6 +292,36 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 				} catch (InterruptedException ie) {}
 			}
 		} while (!saved);
+	}
+
+	@Override
+	public void removeAccessTokenUsingRefreshToken(String refreshToken) {
+		try {
+			getRefreshTokenCache().remove(refreshToken);
+			super.removeAccessTokenUsingRefreshToken(refreshToken);
+		} catch (Exception e) {
+			LOGGER.log(Level.WARNING, "Error removing access token using refresh token " + refreshToken, e);
+		}
+	}
+
+	@Override
+	public void removeAccessToken(String tokenValue) {
+		try {
+			getAccessTokenCache().remove(tokenValue);
+			super.removeAccessToken(tokenValue);
+		} catch (Exception e) {
+			LOGGER.log(Level.WARNING, "Error removing access token " + tokenValue, e);
+		}
+	}
+
+	@Override
+	public void removeRefreshToken(String token) {
+		try {
+			getRefreshTokenCache().remove(token);
+			super.removeRefreshToken(token);
+		} catch (Exception e) {
+			LOGGER.log(Level.WARNING, "Error removing refresh token " + token, e);
+		}
 	}
 
 }
