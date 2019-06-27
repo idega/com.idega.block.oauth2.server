@@ -1,12 +1,12 @@
 package com.idega.block.oauth2.server.configuration;
 
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.ejb.FinderException;
 import javax.servlet.http.HttpServletRequest;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +36,7 @@ import com.idega.presentation.IWContext;
 import com.idega.servlet.filter.RequestResponseProvider;
 import com.idega.user.dao.UserDAO;
 import com.idega.user.data.bean.User;
+import com.idega.util.CoreConstants;
 import com.idega.util.CoreUtil;
 import com.idega.util.Encrypter;
 import com.idega.util.StringUtil;
@@ -158,7 +159,13 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		LoginTable loginTable = null;
 		try {
 			loginTable = getLoginTableHome().findByLogin(login);
-		} catch (FinderException e) {}
+		} catch (Exception e) {}
+		if (loginTable == null && !StringUtil.isEmpty(login)) {
+			try {
+				login = URLDecoder.decode(login, CoreConstants.ENCODING_UTF8);
+				loginTable = getLoginTableHome().findByLogin(login);
+			} catch (Exception e) {}
+		}
 		if (loginTable != null && !StringUtil.isEmpty(password)) {
 			String userPassword = loginTable.getUserPassword();
 			if (StringUtil.isEmpty(userPassword)) {
@@ -181,7 +188,18 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 
 		com.idega.user.data.bean.User user = null;
 		if (loginTable == null) {
-			UserCredentials credentials = getUserCredentialsDAO().getUserCredentials(login, password);
+			UserCredentials credentials = null;
+			UserCredentialsDAO userCredentialsDAO = null;
+			try {
+				userCredentialsDAO = getUserCredentialsDAO();
+			} catch (Exception e) {}
+			if (userCredentialsDAO != null) {
+				try {
+					credentials = userCredentialsDAO.getUserCredentials(login, password);
+				} catch (Exception e) {
+					LOGGER.log(Level.WARNING, "Error getting credentials for username " + login, e);
+				}
+			}
 			if (credentials != null) {
 				Integer userId = credentials.getUserId();
 				if (userId != null) {
