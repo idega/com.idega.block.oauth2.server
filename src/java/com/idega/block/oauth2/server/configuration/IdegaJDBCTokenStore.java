@@ -245,21 +245,7 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 				super.storeAccessToken(token, authentication);
 				saved = Boolean.TRUE;
 
-				String tokenId = token.getValue();
-				if (!StringUtil.isEmpty(tokenId)) {
-					Map<String, OAuth2AccessToken> accessTokens = getAccessTokenCache();
-					if (accessTokens != null) {
-						accessTokens.put(tokenId, token);
-					}
-
-					Map<String, OAuth2Authentication> authentications = getAuthenticationCache(false);
-					if (authentications != null) {
-						authentications.put(tokenId, authentication);
-					}
-				}
-
-				OAuth2RefreshToken refreshToken = token.getRefreshToken();
-				updateRefreshCaches(tokenId, refreshToken, authentication);
+				addAccessTokenToCache(token, authentication);
 			} catch (DuplicateKeyException e) {
 				LOGGER.log(
 						Level.WARNING,
@@ -321,6 +307,65 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 			super.removeRefreshToken(token);
 		} catch (Exception e) {
 			LOGGER.log(Level.WARNING, "Error removing refresh token " + token, e);
+		}
+	}
+
+	public void addAccessTokenToCache(OAuth2AccessToken token, OAuth2Authentication authentication) {
+		if (token == null || token.isExpired()) {
+			return;
+		}
+
+		String tokenId = token.getValue();
+		if (!StringUtil.isEmpty(tokenId)) {
+			Map<String, OAuth2AccessToken> accessTokens = getAccessTokenCache();
+			if (accessTokens != null) {
+				accessTokens.put(tokenId, token);
+			}
+
+			if (authentication != null) {
+				Map<String, OAuth2Authentication> authentications = getAuthenticationCache(false);
+				if (authentications != null) {
+					authentications.put(tokenId, authentication);
+				}
+			}
+		}
+
+		OAuth2RefreshToken refreshToken = token.getRefreshToken();
+		updateRefreshCaches(tokenId, refreshToken, authentication);
+	}
+
+	public void removeTokensFromCache(OAuth2AccessToken token) {
+		if (token == null) {
+			return;
+		}
+
+		String tokenId = token.getValue();
+		if (!StringUtil.isEmpty(tokenId)) {
+			Map<String, OAuth2AccessToken> accessTokens = getAccessTokenCache();
+			if (accessTokens != null) {
+				accessTokens.remove(tokenId);
+			}
+
+			Map<String, OAuth2Authentication> authentications = getAuthenticationCache(false);
+			if (authentications != null) {
+				authentications.remove(tokenId);
+			}
+		}
+
+		OAuth2RefreshToken refreshToken = token.getRefreshToken();
+		if (refreshToken != null) {
+			String refreshTokenId = refreshToken.getValue();
+			if (!StringUtil.isEmpty(refreshTokenId)) {
+				Map<String, OAuth2RefreshToken> refreshTokens = getRefreshTokenCache();
+				if (refreshTokens != null) {
+					refreshTokens.remove(refreshTokenId);
+				}
+
+				Map<String, OAuth2Authentication> authentications = getAuthenticationCache(true);
+				if (authentications != null) {
+					authentications.remove(refreshTokenId);
+				}
+			}
 		}
 	}
 
