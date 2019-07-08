@@ -37,7 +37,6 @@ import com.idega.servlet.filter.RequestResponseProvider;
 import com.idega.user.dao.UserDAO;
 import com.idega.user.data.bean.User;
 import com.idega.util.CoreConstants;
-import com.idega.util.CoreUtil;
 import com.idega.util.Encrypter;
 import com.idega.util.StringUtil;
 import com.idega.util.expression.ELUtil;
@@ -262,16 +261,21 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		}
 
 		String password = null;
-		IWContext iwc = CoreUtil.getIWContext();
-		if (iwc != null) {
-			HttpServletRequest request = iwc.getRequest();
+		RequestResponseProvider requestResponseProvider = null;
+		try {
+			requestResponseProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
+		} catch (Exception e) {}
+		if (requestResponseProvider != null) {
+			HttpServletRequest request = requestResponseProvider.getRequest();
 			String userName = request == null ? null : request.getHeader("username");
 			if (!StringUtil.isEmpty(userName) && !"undefined".equals(userName) && !userName.equals(username)) {
 				username = userName;
 			}
 
 			password = request == null ? null : request.getHeader("password");
-			password = StringUtil.isEmpty(password) || "undefined".equals(password) ? iwc.getParameter("password") : password;
+			password = StringUtil.isEmpty(password) || "undefined".equals(password) ?
+					request == null ? null : request.getParameter("password") :
+					password;
 		}
 
 		UserCredentials credentials = credentialsDAO.getUserCredentials(username, password);
