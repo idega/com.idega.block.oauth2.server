@@ -82,21 +82,38 @@
  */
 package com.idega.block.oauth2.server.data.dao.impl;
 
+import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Scope;
+import org.springframework.security.oauth2.common.OAuth2AccessToken;
+import org.springframework.security.oauth2.common.util.SerializationUtils;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
 import org.springframework.stereotype.Service;
 
+import com.idega.block.oauth2.server.configuration.IdegaJDBCTokenStore;
 import com.idega.block.oauth2.server.data.dao.OAuth2DAO;
+import com.idega.core.business.DefaultSpringBean;
 import com.idega.data.SimpleQuerier;
+import com.idega.idegaweb.IWMainApplicationSettings;
+import com.idega.util.ArrayUtil;
+import com.idega.util.CoreConstants;
+import com.idega.util.DBUtil;
 import com.idega.util.ListUtil;
+import com.idega.util.StringUtil;
+import com.idega.util.dbschema.SQLSchemaAdapter;
+import com.idega.util.expression.ELUtil;
 
 /**
  * <p>You can report about problems to:
@@ -107,13 +124,29 @@ import com.idega.util.ListUtil;
  */
 @Service
 @Scope(BeanDefinition.SCOPE_SINGLETON)
-public class OAuth2DAOImpl implements OAuth2DAO {
+public class OAuth2DAOImpl extends DefaultSpringBean implements OAuth2DAO {
+
+	@Autowired(required = false)
+	private JdbcTokenStore jdbcTokenStore;
+
+	private JdbcTokenStore getJdbcTokenStore() {
+		if (jdbcTokenStore == null) {
+			try {
+				ELUtil.getInstance().autowire(this);
+			} catch (Exception e) {}
+		}
+		return jdbcTokenStore;
+	}
 
 	private void execute(String query) {
+		execute(query, true);
+	}
+
+	private void execute(String query, boolean clearCaches) {
 		try {
-			SimpleQuerier.executeUpdate(query, true);
+			SimpleQuerier.executeUpdate(query, clearCaches);
 		} catch (SQLException e) {
-			java.util.logging.Logger.getLogger(getClass().getName()).log(
+			getLogger().log(
 					Level.WARNING,
 					"Failed to execute query '" + query +
 					"' cause of: ", e);
@@ -237,7 +270,7 @@ public class OAuth2DAOImpl implements OAuth2DAO {
 		try {
 			connection = SimpleQuerier.getConnection();
 		} catch (SQLException e) {
-			java.util.logging.Logger.getLogger(getClass().getName()).log(
+			getLogger().log(
 					Level.WARNING,
 					"Failed to get connection to database, cause of", e);
 		}
@@ -246,7 +279,7 @@ public class OAuth2DAOImpl implements OAuth2DAO {
 		try {
 			meta = connection.getMetaData();
 		} catch (SQLException e) {
-			java.util.logging.Logger.getLogger(getClass().getName()).log(
+			getLogger().log(
 					Level.WARNING, ""
 							+ "Failed to get database metadata, cause of:", e);
 		}
@@ -255,7 +288,7 @@ public class OAuth2DAOImpl implements OAuth2DAO {
 		try {
 			resultSet = meta.getTables(null, null, "%", null);
 		} catch (SQLException e) {
-			java.util.logging.Logger.getLogger(getClass().getName()).log(Level.WARNING,
+			getLogger().log(Level.WARNING,
 					"Failed to get existing table names, cause of:", e);
 		}
 
@@ -265,7 +298,7 @@ public class OAuth2DAOImpl implements OAuth2DAO {
 				tableNames.add(resultSet.getString("TABLE_NAME"));
 			}
 		} catch (SQLException e) {
-			java.util.logging.Logger.getLogger(getClass().getName()).log(
+			getLogger().log(
 					Level.WARNING,
 					"Failed to get table names, cause of:", e);
 		}
@@ -306,4 +339,140 @@ public class OAuth2DAOImpl implements OAuth2DAO {
 			}
 		}
 	}
+
+	private List<String> doCacheAccessTokens(int from, int step, IdegaJDBCTokenStore jdbcTokenStore) {
+		String query = null;
+		try {
+			query = "select token_id, token, authentication from oauth_access_token";
+			String dataStoreType = DBUtil.getDatastoreType();
+			if (!StringUtil.isEmpty(dataStoreType) && SQLSchemaAdapter.DBTYPE_MYSQL.equals(dataStoreType)) {
+				query += " LIMIT " + from + ", " + step;
+			}
+
+			List<Serializable[]> allData = SimpleQuerier.executeQuery(query, 3);
+			if (ListUtil.isEmpty(allData)) {
+				return null;
+			}
+
+			List<String> tokensIdsToDelete = new ArrayList<>();
+			for (Serializable[] data: allData) {
+				if (ArrayUtil.isEmpty(data)) {
+					continue;
+				}
+
+				String tokenId = (String) data[0];
+				Serializable token = data[1];
+				if (!(token instanceof byte[]) && !StringUtil.isEmpty(tokenId)) {
+					tokensIdsToDelete.add(tokenId);
+					continue;
+				}
+
+				OAuth2AccessToken accessToken = null;
+				if (token instanceof byte[]) {
+					accessToken = SerializationUtils.deserialize((byte[]) token);
+				}
+				if (accessToken == null || accessToken.isExpired()) {
+					tokensIdsToDelete.add(tokenId);
+
+					if (accessToken != null && jdbcTokenStore != null) {
+						jdbcTokenStore.removeTokensFromCache(accessToken);
+					}
+
+					continue;
+				}
+
+				if (jdbcTokenStore != null) {
+					OAuth2Authentication authentication = null;
+					Serializable auth = data[2];
+					if (auth instanceof byte[]) {
+						authentication = SerializationUtils.deserialize((byte[]) auth);
+					}
+
+					jdbcTokenStore.addAccessTokenToCache(accessToken, authentication);
+				}
+			}
+			return tokensIdsToDelete;
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error caching access tokens from " + from + ". SQL: " + query, e);
+		}
+		return null;
+	}
+
+	@Override
+	public void doCacheAccessTokens() {
+		try {
+			JdbcTokenStore jdbcTokenStore = getJdbcTokenStore();
+			IdegaJDBCTokenStore idegaJdbcTokenStore = jdbcTokenStore instanceof IdegaJDBCTokenStore ?
+					(IdegaJDBCTokenStore) jdbcTokenStore :
+					null;
+
+			int totalRecords = SimpleQuerier.executeIntQuery("select count(token_id) from oauth_access_token");
+			final int toCache = totalRecords;
+			int from = 0;
+			int step = 1000;
+			List<String> allTokensIdsToDelete = new CopyOnWriteArrayList<>();
+			while (totalRecords > 0) {
+				getLogger().info("Will cache access tokens from " + from + " to " + (from + step) + " out of " + toCache);
+				List<String> tokensIdsToDelete = doCacheAccessTokens(from, step, idegaJdbcTokenStore);
+				if (!ListUtil.isEmpty(tokensIdsToDelete)) {
+					allTokensIdsToDelete.addAll(tokensIdsToDelete);
+				}
+				from = from + step;
+				totalRecords = totalRecords - step;
+			}
+
+			int tokensToDelete = allTokensIdsToDelete.size();
+			getLogger().info("Finished caching access tokens" + (ListUtil.isEmpty(allTokensIdsToDelete) ? CoreConstants.EMPTY : ". Will delete " + tokensToDelete + " old token(s)"));
+			if (!ListUtil.isEmpty(allTokensIdsToDelete)) {
+				IWMainApplicationSettings settings = getSettings();
+				String param = "oauth.delete_expired_tokens";
+				Thread cleaner = new Thread(new Runnable() {
+
+					@Override
+					public void run() {
+						int sliceSize = 1000;
+						int totalDeleted = 0;
+						String sql = "delete from oauth_access_token where token_id in (";
+						while (allTokensIdsToDelete.size() > 0 && settings.getBoolean(param, true)) {
+							List<String> slice = null;
+							try {
+								slice = allTokensIdsToDelete.size() > sliceSize ?
+									new CopyOnWriteArrayList<>(allTokensIdsToDelete.subList(0, sliceSize)) :
+									new CopyOnWriteArrayList<>(allTokensIdsToDelete);
+								allTokensIdsToDelete.removeAll(slice);
+
+								int actualSliceSize = slice.size();
+								getLogger().info("Deleting " + actualSliceSize + " expired tokens out of " + tokensToDelete);
+
+								StringBuilder script = new StringBuilder(sql);
+								for (Iterator<String> iter = slice.iterator(); iter.hasNext();) {
+									String id = iter.next().trim();
+									if (StringUtil.isEmpty(id)) {
+										continue;
+									}
+
+									script.append(CoreConstants.QOUTE_SINGLE_MARK).append(id).append(CoreConstants.QOUTE_SINGLE_MARK);
+									if (iter.hasNext()) {
+										script.append(CoreConstants.COMMA).append(CoreConstants.SPACE);
+									}
+								}
+								script.append(CoreConstants.BRACKET_RIGHT).append(CoreConstants.SEMICOLON);
+								execute(script.toString(), false);
+
+								totalDeleted += actualSliceSize;
+								getLogger().info("Deleted " + totalDeleted + " expired tokens out of " + tokensToDelete);
+							} catch (Exception e) {
+								getLogger().log(Level.WARNING, "Error deleting old tokens " + slice, e);
+							}
+						}
+					}
+
+				});
+				cleaner.start();
+			}
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error caching access tokens", e);
+		}
+	}
+
 }
