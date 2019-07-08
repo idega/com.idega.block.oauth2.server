@@ -82,11 +82,14 @@
  */
 package com.idega.block.oauth2.server.provider.refresh;
 
+import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.servlet.http.HttpServletRequest;
 
 import org.hsqldb.lib.StringUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.security.oauth2.provider.ClientDetails;
 import org.springframework.security.oauth2.provider.ClientDetailsService;
@@ -94,10 +97,10 @@ import org.springframework.security.oauth2.provider.OAuth2RequestFactory;
 import org.springframework.security.oauth2.provider.TokenRequest;
 import org.springframework.security.oauth2.provider.refresh.RefreshTokenGranter;
 import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
+import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
 
-import com.idega.presentation.IWContext;
 import com.idega.servlet.filter.RequestResponseProvider;
-import com.idega.util.CoreUtil;
+import com.idega.util.CoreConstants;
 import com.idega.util.expression.ELUtil;
 
 /**
@@ -109,8 +112,44 @@ public class IdegaRefreshTokenGranter extends RefreshTokenGranter {
 
 	private static final Logger LOGGER = Logger.getLogger(IdegaRefreshTokenGranter.class.getName());
 
+	@Autowired(required = false)
+	private JdbcTokenStore jdbcTokenStore;
+
+	private JdbcTokenStore getJdbcTokenStore() {
+		if (jdbcTokenStore == null) {
+			try {
+				ELUtil.getInstance().autowire(this);
+			} catch (Exception e) {}
+		}
+		return jdbcTokenStore;
+	}
+
 	public IdegaRefreshTokenGranter(AuthorizationServerTokenServices tokenServices, ClientDetailsService clientDetailsService, OAuth2RequestFactory requestFactory) {
 		super(tokenServices, clientDetailsService, requestFactory);
+	}
+
+	private OAuth2AccessToken getAccessToken(String accessToken) {
+		if (StringUtil.isEmpty(accessToken)) {
+			return null;
+		}
+
+		try {
+			JdbcTokenStore jdbcTokenStore = getJdbcTokenStore();
+			if (jdbcTokenStore == null) {
+				return null;
+			}
+
+			OAuth2AccessToken token = jdbcTokenStore.readAccessToken(accessToken);
+			if (token == null || token.isExpired()) {
+				return null;
+			}
+
+			return token;
+		} catch (Exception e) {
+			LOGGER.log(Level.WARNING, "Error getting access token by " + accessToken, e);
+		}
+
+		return null;
 	}
 
 	/*
@@ -119,42 +158,57 @@ public class IdegaRefreshTokenGranter extends RefreshTokenGranter {
 	 */
 	@Override
 	protected OAuth2AccessToken getAccessToken(ClientDetails client, TokenRequest tokenRequest) {
-		String refreshToken = tokenRequest.getRequestParameters().get("refresh_token");
-
-		if (StringUtil.isEmpty(refreshToken)) {
-			refreshToken = getRefreshToken(CoreUtil.getIWContext());
-		}
-		if (StringUtil.isEmpty(refreshToken)) {
-			RequestResponseProvider requestResponseProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
-			refreshToken = getRefreshToken(requestResponseProvider == null ? null : requestResponseProvider.getRequest());
+		Map<String, String> params = tokenRequest.getRequestParameters();
+		String accessToken = getToken("access_token", params, client);
+		OAuth2AccessToken token = getAccessToken(accessToken);
+		if (token != null) {
+			return token;
 		}
 
-		if (StringUtil.isEmpty(refreshToken)) {
-			LOGGER.warning("Failed to get refresh_token for client " + client.getClientId());
-		}
-
+		String refreshToken = getToken("refresh_token", params, client);
 		return getTokenServices().refreshAccessToken(refreshToken, tokenRequest);
 	}
 
-	private String getRefreshToken(IWContext iwc) {
-		if (iwc == null) {
+	private String getToken(String name, Map<String, String> params, ClientDetails client) {
+		String token = params == null ? null : params.get(name);
+		if (!StringUtil.isEmpty(token)) {
+			return token;
+		}
+
+		RequestResponseProvider requestResponseProvider = null;
+		try {
+			requestResponseProvider = ELUtil.getInstance().getBean(RequestResponseProvider.class);
+		} catch (Exception e) {}
+
+		token = getToken(requestResponseProvider == null ? null : requestResponseProvider.getRequest(), name);
+
+		if (StringUtil.isEmpty(token)) {
+			LOGGER.warning("Failed to get " + name + (client == null ? CoreConstants.EMPTY : " for client " + client.getClientId()));
 			return null;
 		}
 
-		String refreshToken = iwc.getParameter("refresh_token");
-		if (StringUtil.isEmpty(refreshToken)) {
-			refreshToken = getRefreshToken(iwc.getRequest());
-		}
-
-		return refreshToken;
+		return token;
 	}
 
-	private String getRefreshToken(HttpServletRequest request) {
+	private String getToken(HttpServletRequest request, String name) {
 		if (request == null) {
 			return null;
 		}
 
-		return request.getHeader("refresh_token");
+		String token = request.getParameter(name);
+		if (StringUtil.isEmpty(token)) {
+			token = getToken(name, request);
+		}
+
+		return token;
+	}
+
+	private String getToken(String name, HttpServletRequest request) {
+		if (request == null) {
+			return null;
+		}
+
+		return request.getHeader(name);
 	}
 
 }
