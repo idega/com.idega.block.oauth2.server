@@ -174,6 +174,15 @@ public class IWBundleStarter implements IWBundleStartable {
 					"ROLE_APP");
 			details.setClientSecret("felix_desktop_application");
 			getClientDetailsService().addClientDetails(details);
+			
+			details = new BaseClientDetails(
+					"egov_dashboard", 
+					null, 
+					"read,write,trust", 
+					"password,authorization_code,refresh_token,implicit", 
+					"ROLE_APP");
+			details.setClientSecret("egov_dashboard");
+			getClientDetailsService().addClientDetails(details);
 		}
 	}
 
