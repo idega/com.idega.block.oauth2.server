@@ -240,7 +240,14 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 				UserLogin userLogin = getUserLoginDAO().find(UserLogin.class, (Integer) loginTable.getPrimaryKey());
 				loginBusinessBean.setUserLoggedIn(request, user, userLogin);
 				String type = request.getParameter("type");
-				loginBusinessBean.doPublishLoggedInEvent(request, user, userLogin.getUserLogin(), StringUtil.isEmpty(type) ? userLogin.getLoginType() : type);
+				loginBusinessBean.doPublishLoggedInEvent(
+						iwc.getRequest(),
+						iwc.getResponse(),
+						iwc.getServletContext(),
+						user,
+						userLogin.getUserLogin(),
+						StringUtil.isEmpty(type) ? userLogin.getLoginType() : type
+				);
 				return user;
 			}
 		} catch (Exception e) {
