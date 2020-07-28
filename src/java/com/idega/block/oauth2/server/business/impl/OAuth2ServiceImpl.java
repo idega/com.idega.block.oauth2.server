@@ -122,10 +122,13 @@ import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.OAuth2Request;
 import org.springframework.security.oauth2.provider.OAuth2RequestFactory;
 import org.springframework.security.oauth2.provider.TokenRequest;
+import org.springframework.security.oauth2.provider.client.BaseClientDetails;
 import org.springframework.security.oauth2.provider.client.JdbcClientDetailsService;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.idega.block.login.LoginConstants;
 import com.idega.block.login.bean.LoggedInUser;
 import com.idega.block.login.bean.OAuthToken;
 import com.idega.block.login.bean.UserCredentials;
@@ -449,7 +452,12 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 
 	@Override
 	public String getDefaultClientId() {
-		return getApplicationProperty("oauth_default_client_id");
+		return getApplicationProperty(LoginConstants.OAUTH_DEFAULT_CLIENT_ID);
+	}
+
+	@Override
+	public String getUnexpiringClientId() {
+		return getApplicationProperty(LoginConstants.OAUTH_UNEXPIRING_CLIENT_ID);
 	}
 
 	private String getDefaultSecret() {
@@ -695,6 +703,49 @@ public class OAuth2ServiceImpl extends DefaultSpringBean implements OAuth2Servic
 		}
 
 		return null;
+	}
+
+	@Override
+	@Transactional(readOnly = false)
+	public Boolean createOAuthClient(
+			String clientId,
+			String clientSecret,
+			Integer accessTokenValiditySeconds,
+			Integer refreshTokenValiditySeconds
+	) {
+		try {
+			JdbcClientDetailsService clientDetailsService = getClientDetailsService();
+			if (clientDetailsService == null) {
+				return Boolean.FALSE;
+			}
+
+			ClientDetails clientDetails = null;
+			try {
+				clientDetails = clientDetailsService.loadClientByClientId(clientId);
+			} catch (Exception e) {}
+
+			if (clientDetails != null) {
+				return Boolean.TRUE;
+			}
+
+			BaseClientDetails details = new BaseClientDetails(
+					clientId,
+					null,
+					"read,write,trust",
+					"password,authorization_code,refresh_token,implicit",
+					"ROLE_APP"
+			);
+			details.setAccessTokenValiditySeconds(accessTokenValiditySeconds);
+			details.setRefreshTokenValiditySeconds(refreshTokenValiditySeconds);
+			details.setClientSecret(clientSecret);
+			clientDetailsService.addClientDetails(details);
+
+			return Boolean.TRUE;
+		} catch (Exception e) {
+			getLogger().log(Level.WARNING, "Error creating OAuth client " + clientId + " with secret " + clientSecret, e);
+		}
+
+		return Boolean.FALSE;
 	}
 
 }
