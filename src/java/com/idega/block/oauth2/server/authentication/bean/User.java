@@ -14,6 +14,12 @@ public class User extends LoggedInUser {
 
 	private Address address;
 
+	private String fullName;
+
+	private String email;
+
+	private String mobilePhone;
+
 	public User() {
 		super();
 	}
@@ -23,6 +29,7 @@ public class User extends LoggedInUser {
 
 		if (loggedInUser != null) {
 			setName(loggedInUser.getName());
+			setFullName(getName());
 			setPersonalID(loggedInUser.getPersonalID());
 			setLogin(loggedInUser.getLogin());
 			setToken(loggedInUser.getToken());
@@ -42,6 +49,30 @@ public class User extends LoggedInUser {
 
 	public void setAddress(Address address) {
 		this.address = address;
+	}
+
+	public String getFullName() {
+		return fullName;
+	}
+
+	public void setFullName(String fullName) {
+		this.fullName = fullName;
+	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
+	public String getMobilePhone() {
+		return mobilePhone;
+	}
+
+	public void setMobilePhone(String mobilePhone) {
+		this.mobilePhone = mobilePhone;
 	}
 
 }
