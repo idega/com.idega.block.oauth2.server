@@ -7,8 +7,12 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import com.idega.core.location.data.Commune;
+import com.idega.core.location.data.CommuneHome;
+import com.idega.core.location.data.CountryHome;
 import com.idega.core.location.data.bean.Country;
 import com.idega.core.location.data.bean.PostalCode;
+import com.idega.data.IDOLookup;
 import com.idega.idegaweb.IWMainApplication;
 import com.idega.idegaweb.IWMainApplicationSettings;
 import com.idega.util.CoreConstants;
@@ -51,7 +55,8 @@ public class Address implements Serializable {
 					postalCode == null ? null : postalCode.getPostalCode(),
 					country == null ? countryFromPostalCode == null ? null : countryFromPostalCode.getName(locale) : country.getName(locale),
 					country == null ? countryFromPostalCode == null ? null : countryFromPostalCode.getId() : country.getId(),
-					postalCode == null ? null : postalCode.getId()
+					postalCode == null ? null : postalCode.getId(),
+					locale
 			);
 		}
 	}
@@ -74,7 +79,8 @@ public class Address implements Serializable {
 					postalCode == null ? null : postalCode.getPostalCode(),
 					country == null ? countryFromPostalCode == null ? null : countryFromPostalCode.getName(locale) : country.getName(locale),
 					country == null ? countryFromPostalCode == null ? null : Integer.valueOf(countryFromPostalCode.getPrimaryKey().toString()) : Integer.valueOf(country.getPrimaryKey().toString()),
-					postalCode == null ? null : Integer.valueOf(postalCode.getPrimaryKey().toString())
+					postalCode == null ? null : Integer.valueOf(postalCode.getPrimaryKey().toString()),
+					locale
 			);
 		}
 	}
@@ -82,10 +88,10 @@ public class Address implements Serializable {
 	public Address(String streetAddress, String city, String postalCode, String country) {
 		this();
 
-		initialize(streetAddress, city, postalCode, country, null, null);
+		initialize(streetAddress, city, postalCode, country, null, null, null);
 	}
 
-	private void initialize(String streetAddress, String city, String postalCode, String country, Integer countryId, Integer postalCodeId) {
+	private void initialize(String streetAddress, String city, String postalCode, String country, Integer countryId, Integer postalCodeId, Locale locale) {
 		setStreetAddress(streetAddress);
 		setCity(city);
 		setPostalCode(postalCode);
@@ -115,10 +121,19 @@ public class Address implements Serializable {
 			}
 
 			if (settings.getBoolean("add_country_to_address_label", true)) {
-				if (!StringUtil.isEmpty(getCountry())) {
+				String locCountry = null;
+				if (countryId != null) {
+					try {
+						CountryHome countryHome = (CountryHome) IDOLookup.getHome(com.idega.core.location.data.Country.class);
+						com.idega.core.location.data.Country countryEntity = countryHome.findByPrimaryKey(countryId);
+						locCountry = countryEntity.getLocalizedName(locale);
+					} catch (Exception e) {}
+				}
+
+				if (!StringUtil.isEmpty(country) || !StringUtil.isEmpty(locCountry)) {
 					addressLabel.append(CoreConstants.COMMA);
 					addressLabel.append(CoreConstants.SPACE);
-					addressLabel.append(getCountry());
+					addressLabel.append(StringUtil.isEmpty(locCountry) ? country : locCountry);
 				}
 			}
 		}
