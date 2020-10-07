@@ -214,15 +214,17 @@ public class Address implements Serializable {
 
 			String countryName = null, countryISO = null;
 			Integer countryId = getCountryId();
-			countryId = countryId == null ? StringHandler.isNumeric(getCountry()) ? Integer.valueOf(getCountry()) : null : countryId;
-			if (countryId != null) {
-				try {
-					CountryHome countryHome = (CountryHome) IDOLookup.getHome(com.idega.core.location.data.Country.class);
-					com.idega.core.location.data.Country country = countryHome.findByPrimaryKey(countryId);
-					countryName = country.getName();
-					countryISO = country.getIsoAbbreviation();
-				} catch (Exception e) {}
-			}
+			countryId = countryId == null ?
+					StringHandler.isNumeric(getCountry()) ? Integer.valueOf(getCountry()) : null :
+					countryId;
+			try {
+				CountryHome countryHome = (CountryHome) IDOLookup.getHome(com.idega.core.location.data.Country.class);
+				com.idega.core.location.data.Country country = countryId == null ?
+						countryHome.findByCountryName(getCountry()) :
+						countryHome.findByPrimaryKey(countryId);
+				countryName = country.getName();
+				countryISO = country.getIsoAbbreviation();
+			} catch (Exception e) {}
 			fullAddress = fullAddress.concat(StringUtil.isEmpty(countryName) || StringUtil.isEmpty(countryISO) ?
 					AddressBusinessBean.NOT_AVAILABLE :
 					countryName.concat(CoreConstants.COLON).concat(countryISO)).concat(CoreConstants.SEMICOLON);
