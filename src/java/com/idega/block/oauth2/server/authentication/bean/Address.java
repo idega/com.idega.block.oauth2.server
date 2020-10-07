@@ -7,6 +7,7 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import com.idega.core.location.business.AddressBusinessBean;
 import com.idega.core.location.data.Commune;
 import com.idega.core.location.data.CommuneHome;
 import com.idega.core.location.data.CountryHome;
@@ -16,6 +17,7 @@ import com.idega.data.IDOLookup;
 import com.idega.idegaweb.IWMainApplication;
 import com.idega.idegaweb.IWMainApplicationSettings;
 import com.idega.util.CoreConstants;
+import com.idega.util.StringHandler;
 import com.idega.util.StringUtil;
 
 @XmlRootElement
@@ -32,6 +34,7 @@ public class Address implements Serializable {
 	private String country;
 
 	private String fullAddress;
+	private String computedFullAddress;
 
 	public Address() {
 		super();
@@ -194,6 +197,72 @@ public class Address implements Serializable {
 
 	public void setFullAddress(String fullAddress) {
 		this.fullAddress = fullAddress;
+	}
+
+	public String getComputedFullAddress() {
+		if (StringUtil.isEmpty(computedFullAddress)) {
+			String fullAddress = CoreConstants.EMPTY;
+
+			String streetAddress = getStreetAddress();
+			fullAddress = fullAddress.concat(StringUtil.isEmpty(streetAddress) ? AddressBusinessBean.NOT_AVAILABLE : streetAddress).concat(CoreConstants.SEMICOLON);
+
+			String postalCode = getPostalCode();
+			String city = getCity();
+			fullAddress = fullAddress.concat(StringUtil.isEmpty(city) || StringUtil.isEmpty(postalCode) ?
+					AddressBusinessBean.NOT_AVAILABLE :
+					postalCode.concat(CoreConstants.SPACE).concat(city)).concat(CoreConstants.SEMICOLON);
+
+			String countryName = null, countryISO = null;
+			Integer countryId = getCountryId();
+			countryId = countryId == null ? StringHandler.isNumeric(getCountry()) ? Integer.valueOf(getCountry()) : null : countryId;
+			if (countryId != null) {
+				try {
+					CountryHome countryHome = (CountryHome) IDOLookup.getHome(com.idega.core.location.data.Country.class);
+					com.idega.core.location.data.Country country = countryHome.findByPrimaryKey(countryId);
+					countryName = country.getName();
+					countryISO = country.getIsoAbbreviation();
+				} catch (Exception e) {}
+			}
+			fullAddress = fullAddress.concat(StringUtil.isEmpty(countryName) || StringUtil.isEmpty(countryISO) ?
+					AddressBusinessBean.NOT_AVAILABLE :
+					countryName.concat(CoreConstants.COLON).concat(countryISO)).concat(CoreConstants.SEMICOLON);
+
+			String communeName = null, communeCode = null;
+			if (!StringUtil.isEmpty(city)) {
+				try {
+					CommuneHome communeHome = (CommuneHome) IDOLookup.getHome(Commune.class);
+					Commune commune = null;
+					try {
+						commune = communeHome.findByCommuneName(city);
+					} catch (Exception e) {}
+					if (commune == null) {
+						commune = communeHome.create();
+						commune.setCommuneName(city);
+						commune.setIsDefault(false);
+						commune.store();
+					} else {
+						communeName = commune.getCommuneName();
+						communeCode = commune.getCommuneCode();
+					}
+					if (StringUtil.isEmpty(communeName)) {
+						commune.setCommuneName(city);
+					}
+					if (StringUtil.isEmpty(communeCode)) {
+						communeCode = commune.getPrimaryKey().toString();
+						commune.setCommuneCode(communeCode);
+					}
+					commune.store();
+				} catch (Exception e) {}
+			}
+			fullAddress = fullAddress.concat(StringUtil.isEmpty(communeName) || StringUtil.isEmpty(communeCode) ? AddressBusinessBean.NOT_AVAILABLE : communeName.concat(CoreConstants.COLON).concat(communeCode));
+
+			this.computedFullAddress = fullAddress;
+		}
+		return computedFullAddress;
+	}
+
+	public void setComputedFullAddress(String computedFullAddress) {
+		this.computedFullAddress = computedFullAddress;
 	}
 
 }
