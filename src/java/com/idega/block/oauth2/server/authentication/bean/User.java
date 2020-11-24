@@ -20,6 +20,9 @@ public class User extends LoggedInUser {
 
 	private String mobilePhone;
 
+	private String pictureURL;
+
+
 	public User() {
 		super();
 	}
@@ -74,5 +77,14 @@ public class User extends LoggedInUser {
 	public void setMobilePhone(String mobilePhone) {
 		this.mobilePhone = mobilePhone;
 	}
+
+	public String getPictureURL() {
+		return pictureURL;
+	}
+
+	public void setPictureURL(String pictureURL) {
+		this.pictureURL = pictureURL;
+	}
+
 
 }
