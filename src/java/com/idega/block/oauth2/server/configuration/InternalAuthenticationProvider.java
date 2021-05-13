@@ -275,12 +275,12 @@ public class InternalAuthenticationProvider implements AuthenticationProvider {
 		if (requestResponseProvider != null) {
 			HttpServletRequest request = requestResponseProvider.getRequest();
 			String userName = request == null ? null : request.getHeader("username");
-			if (!StringUtil.isEmpty(userName) && !"undefined".equals(userName) && !userName.equals(username)) {
+			if (!StringUtil.isEmpty(userName) && !CoreConstants.UNDEFINED.equals(userName) && !userName.equals(username)) {
 				username = userName;
 			}
 
 			password = request == null ? null : request.getHeader("password");
-			password = StringUtil.isEmpty(password) || "undefined".equals(password) ?
+			password = StringUtil.isEmpty(password) || CoreConstants.UNDEFINED.equals(password) ?
 					request == null ? null : request.getParameter("password") :
 					password;
 		}
