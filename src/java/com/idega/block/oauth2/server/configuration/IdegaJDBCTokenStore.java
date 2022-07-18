@@ -82,6 +82,8 @@
  */
 package com.idega.block.oauth2.server.configuration;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -95,6 +97,7 @@ import org.springframework.security.oauth2.common.OAuth2RefreshToken;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.token.store.JdbcTokenStore;
 
+import com.idega.util.StringHandler;
 import com.idega.util.StringUtil;
 
 /**
@@ -106,6 +109,8 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 
 	private static final Logger LOGGER = Logger.getLogger(IdegaJDBCTokenStore.class.getName());
 
+	private static final String MS_SQL_SERVER_DRIVER = "com.microsoft.sqlserver";
+
 	public static final String ACCESS_TOKEN_INSERT_STATEMENT = "replace into oauth_access_token (token_id, token, authentication_id, user_name, client_id, authentication, refresh_token) values (?, ?, ?, ?, ?, ?, ?)";
 	public static final String REFRESH_TOKEN_INSERT_STATEMENT = "replace into oauth_refresh_token (token_id, token, authentication) values (?, ?, ?)";
 
@@ -116,8 +121,35 @@ public class IdegaJDBCTokenStore extends JdbcTokenStore {
 
 	public IdegaJDBCTokenStore(DataSource dataSource) {
 		super(dataSource);
-		setInsertAccessTokenSql(ACCESS_TOKEN_INSERT_STATEMENT);
-		setInsertRefreshTokenSql(REFRESH_TOKEN_INSERT_STATEMENT);
+
+		boolean sqlServer = dataSource.toString().indexOf(MS_SQL_SERVER_DRIVER) != -1;
+		if (!sqlServer) {
+			Class<?> dbDriver = null;
+			Connection connection = null;
+			try {
+				connection = dataSource.getConnection();
+				dbDriver = DriverManager.getDriver(connection.getMetaData().getURL()).getClass();
+			} catch (Exception e) {
+				LOGGER.log(Level.WARNING, "Error getting driver", e);
+			} finally {
+				try {
+					if (connection != null && !connection.isClosed()) {
+						connection.close();
+					}
+				} catch (Exception e) {}
+			}
+			sqlServer = dbDriver != null && dbDriver.getName().indexOf(MS_SQL_SERVER_DRIVER) != -1;
+		}
+
+		String accessTokenSQL = ACCESS_TOKEN_INSERT_STATEMENT;
+		String refreshTokenSQL = REFRESH_TOKEN_INSERT_STATEMENT;
+		if (sqlServer) {
+			accessTokenSQL = StringHandler.replace(accessTokenSQL, "replace", "insert");
+			refreshTokenSQL = StringHandler.replace(refreshTokenSQL, "replace", "insert");
+		}
+
+		setInsertAccessTokenSql(accessTokenSQL);
+		setInsertRefreshTokenSql(refreshTokenSQL);
 	}
 
 	private Map<String, OAuth2AccessToken> getAccessTokenCache() {
