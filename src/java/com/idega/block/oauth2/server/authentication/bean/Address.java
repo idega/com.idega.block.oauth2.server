@@ -82,7 +82,7 @@ public class Address implements Serializable {
 					postalCode == null ? null : postalCode.getPostalCode(),
 					country == null ? countryFromPostalCode == null ? null : countryFromPostalCode.getName(locale) : country.getName(locale),
 					country == null ? countryFromPostalCode == null ? null : Integer.valueOf(countryFromPostalCode.getPrimaryKey().toString()) : Integer.valueOf(country.getPrimaryKey().toString()),
-					postalCode == null ? null : Integer.valueOf(postalCode.getPrimaryKey().toString()),
+					postalCode == null || postalCode.getPrimaryKey() == null ? null : Integer.valueOf(postalCode.getPrimaryKey().toString()),
 					locale
 			);
 		}
